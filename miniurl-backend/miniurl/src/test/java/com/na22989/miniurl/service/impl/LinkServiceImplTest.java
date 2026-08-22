@@ -35,9 +35,12 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static com.na22989.miniurl.common.RedisKeyConstant.CLICK_COUNT_PREFIX;
+import static com.na22989.miniurl.common.RedisKeyConstant.SHORT_CODE_PREFIX;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -156,6 +159,24 @@ class LinkServiceImplTest {
         assertEquals("http://example.com/s/" + SHORT_CODE, result.getShortUrl());
     }
 
+    @Test
+    @DisplayName("createLink() expireTime 已过期 → 跳过 Redis 缓存写，本地缓存照写")
+    void createLink_shouldSkipRedisCacheWhenExpired() {
+        when(shortLinkUtil.nextId()).thenReturn(LINK_ID);
+        when(shortLinkUtil.base62Encode(LINK_ID)).thenReturn(SHORT_CODE);
+        when(linkMapper.insert(isA(Link.class))).thenReturn(1);
+
+        createRequest.setExpireTime(LocalDateTime.now().minusMinutes(5)); // 已过期 → calcCacheTtl 返回负 TTL
+
+        LinkVO result = linkService.createLink(USER_ID, createRequest);
+
+        assertNotNull(result);
+        // 负 TTL → Redis 缓存写入被跳过（否则会把已过期短链缓存起来，永远命中到过期链接）
+        verify(valueOperations, never()).set(anyString(), anyString(), any(Duration.class));
+        // 本地缓存不设 TTL，照写（布隆/本地不判过期，靠 DB 兜底）
+        verify(shortCodeLocalCache).put(eq(SHORT_CODE), any(LinkCacheValue.class));
+    }
+
     // ─── listUserLinks ───
 
     @Test
@@ -272,6 +293,20 @@ class LinkServiceImplTest {
                 () -> linkService.deleteLink(OTHER_USER_ID, deleteRequest));
         assertEquals(ResultCodeEnum.LINK_NOT_FOUND.getCode(), ex.getCode(),
                 "越权删除应返回 LINK_NOT_FOUND，而非 FORBIDDEN");
+    }
+
+    @Test
+    @DisplayName("deleteLink() 应清理 Redis 与 Caffeine 缓存（删除失效）")
+    void deleteLink_shouldCleanupCaches() {
+        when(linkMapper.selectById(LINK_ID)).thenReturn(mockLink);
+        when(linkMapper.deleteById(LINK_ID)).thenReturn(1);
+
+        linkService.deleteLink(USER_ID, deleteRequest);
+
+        // Redis 短链缓存 + 计数 key + 本地 Caffeine 全部失效，防止删了还在缓存里被访问
+        verify(stringRedisTemplate).delete(SHORT_CODE_PREFIX + SHORT_CODE);
+        verify(stringRedisTemplate).delete(CLICK_COUNT_PREFIX + SHORT_CODE);
+        verify(shortCodeLocalCache).invalidate(SHORT_CODE);
     }
 
     // ─── redirect ───
