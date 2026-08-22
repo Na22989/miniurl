@@ -1,0 +1,17 @@
+$kind: http-request
+url: "{{baseUrl}}/api/link/create"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{token}}
+body:
+  type: text
+  content: '{"longUrl": "https://example.com"'
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('畸形JSON应返回 40000 请求体格式错误', function () {
+          pm.expect(pm.response.json().code).to.eql(40000);
+      });
+    language: text/javascript
+order: 1000

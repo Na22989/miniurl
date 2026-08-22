@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.na22989.miniurl.mapper.LinkAccessLogMapper">
+  <resultMap id="BaseResultMap" type="com.na22989.miniurl.model.entity.LinkAccessLog">
+    <!--@mbg.generated-->
+    <!--@Table link_access_log-->
+    <id column="id" jdbcType="BIGINT" property="id" />
+    <result column="link_id" jdbcType="BIGINT" property="linkId" />
+    <result column="short_code" jdbcType="VARCHAR" property="shortCode" />
+    <result column="ip" jdbcType="VARCHAR" property="ip" />
+    <result column="user_agent" jdbcType="VARCHAR" property="userAgent" />
+    <result column="referer" jdbcType="VARCHAR" property="referer" />
+    <result column="access_time" jdbcType="TIMESTAMP" property="accessTime" />
+  </resultMap>
+  <sql id="Base_Column_List">
+    <!--@mbg.generated-->
+    id, link_id, short_code, ip, user_agent, referer, access_time
+  </sql>
+
+  <select id="countDistinctIpByLinkId" resultType="java.lang.Long">
+        select count(distinct(ip))
+        from link_access_log
+        where link_id=#{linkId,jdbcType=BIGINT}
+    </select>
+
+  <select id="countDistinctIpByLinkIdAndAccessTimeBetween" resultType="java.lang.Long">
+    select count(distinct(ip))
+    from link_access_log
+    where link_id=#{linkId,jdbcType=BIGINT}
+    and access_time &gt;= #{minAccessTime,jdbcType=TIMESTAMP}
+    and access_time &lt; #{maxAccessTime,jdbcType=TIMESTAMP}
+  </select>
+
+  <select id="countHourlyTrendByLinkIdAndAccessTimeBetween"
+          resultType="com.na22989.miniurl.model.dto.link.HourlyStatus">
+    select count(*) as pv, count(distinct(ip)) as uv, date_format(access_time, '%Y-%m-%d %H') as hour
+    from link_access_log
+    where link_id=#{linkId,jdbcType=BIGINT}
+    and access_time &gt;= #{minAccessTime,jdbcType=TIMESTAMP}
+    and access_time &lt; #{maxAccessTime,jdbcType=TIMESTAMP}
+    group by hour
+    order by hour
+  </select>
+</mapper>

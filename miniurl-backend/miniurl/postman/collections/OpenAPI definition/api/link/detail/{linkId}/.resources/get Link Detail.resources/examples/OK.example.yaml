@@ -1,0 +1,30 @@
+$kind: http-example
+request:
+  url: "{{baseUrl}}/api/link/detail/:linkId"
+  method: GET
+  headers:
+    Accept: "*/*"
+  pathVariables:
+    linkId: "7391"
+response:
+  statusCode: 200
+  statusText: OK
+  headers:
+    Content-Type: "*/*"
+  body:
+    type: text
+    content: |-
+      {
+        "code": 5429,
+        "message": "string",
+        "data": {
+          "id": 6365,
+          "shortCode": "string",
+          "shortUrl": "string",
+          "longUrl": "string",
+          "userId": 3736,
+          "expireTime": "2005-10-09T18:32:00.481Z",
+          "createTime": "1998-05-25T09:18:39.471Z"
+        }
+      }
+order: 1000

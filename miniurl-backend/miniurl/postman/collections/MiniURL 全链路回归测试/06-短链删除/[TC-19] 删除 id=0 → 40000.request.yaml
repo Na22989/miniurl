@@ -1,0 +1,20 @@
+$kind: http-request
+url: "{{baseUrl}}/api/link/delete"
+method: DELETE
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{token}}
+body:
+  type: text
+  content: |-
+    {
+      "id": 0
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('id=0 应返回 40000', function () {
+          pm.expect(pm.response.json().code).to.eql(40000);
+      });
+    language: text/javascript
+order: 4000

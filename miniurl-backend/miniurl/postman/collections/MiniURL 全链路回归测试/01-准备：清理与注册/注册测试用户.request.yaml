@@ -1,0 +1,22 @@
+$kind: http-request
+url: "{{baseUrl}}/api/user/register"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "username": "{{testUsername}}",
+      "password": "123456"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('注册成功或用户名已存在', function () {
+          pm.expect(pm.response.json().code).to.be.oneOf([20000, 41100]);
+      });
+      // 保存用户名供后续使用
+      pm.collectionVariables.set('testUsername', 'regression_test_user');
+    language: text/javascript
+order: 1000

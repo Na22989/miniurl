@@ -1,0 +1,35 @@
+$kind: http-request
+url: "{{baseUrl}}/s/expired"
+method: GET
+scripts:
+  - type: afterResponse
+    code: |-
+      // 创建一条已过期的短链
+      var expiredReq = {
+        url: pm.collectionVariables.get('baseUrl') + '/api/link/create',
+        method: 'POST',
+        header: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + pm.collectionVariables.get('token')
+        },
+        body: { mode: 'raw', raw: JSON.stringify({
+          longUrl: 'https://www.example.com',
+          expireTime: '2020-01-01T00:00:00'
+        }) }
+      };
+
+      pm.sendRequest(expiredReq, function (err, res) {
+          if (err) { pm.expect.fail('创建过期短链失败: ' + err); return; }
+          var code = res.json().data.shortCode;
+          pm.sendRequest(
+              pm.collectionVariables.get('baseUrl') + '/s/' + code,
+              function (err2, res2) {
+                  if (err2) { pm.expect.fail('跳转请求失败: ' + err2); return; }
+                  pm.test('过期短链应返回 42101', function () {
+                      pm.expect(res2.json().code).to.eql(42101);
+                  });
+              }
+          );
+      });
+    language: text/javascript
+order: 3000

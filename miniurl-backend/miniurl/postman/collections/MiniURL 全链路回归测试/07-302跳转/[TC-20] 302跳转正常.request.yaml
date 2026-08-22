@@ -1,0 +1,35 @@
+$kind: http-request
+url: "{{baseUrl}}/s/{{shortCode}}"
+method: GET
+scripts:
+  - type: afterResponse
+    code: |-
+      // 创建一条新短链用于跳转测试
+      var createReq = {
+        url: pm.collectionVariables.get('baseUrl') + '/api/link/create',
+        method: 'POST',
+        header: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + pm.collectionVariables.get('token')
+        },
+        body: { mode: 'raw', raw: JSON.stringify({longUrl: 'https://www.baidu.com'}) }
+      };
+
+      pm.sendRequest(createReq, function (err, res) {
+          if (err) { pm.expect.fail('创建测试短链失败: ' + err); return; }
+          var code = res.json().data.shortCode;
+          // 访问短链，禁止自动重定向
+          pm.sendRequest({
+              url: pm.collectionVariables.get('baseUrl') + '/s/' + code,
+              method: 'GET',
+              followRedirects: false
+          }, function (err2, res2) {
+              if (err2) { pm.expect.fail('跳转请求失败: ' + err2); return; }
+              pm.test('跳转应返回 302, Location指向百度', function () {
+                  pm.expect(res2.code).to.eql(302);
+                  pm.expect(res2.headers.location).to.eql('https://www.baidu.com');
+              });
+          });
+      });
+    language: text/javascript
+order: 1000

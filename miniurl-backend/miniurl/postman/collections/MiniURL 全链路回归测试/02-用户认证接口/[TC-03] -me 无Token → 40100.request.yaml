@@ -1,0 +1,12 @@
+$kind: http-request
+name: "[TC-03] /me 无Token → 40100"
+url: "{{baseUrl}}/api/user/me"
+method: GET
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('无Token应返回 40100', function () {
+          pm.expect(pm.response.json().code).to.eql(40100);
+      });
+    language: text/javascript
+order: 3000

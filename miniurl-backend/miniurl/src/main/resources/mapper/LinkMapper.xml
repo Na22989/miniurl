@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.na22989.miniurl.mapper.LinkMapper">
+  <resultMap id="BaseResultMap" type="com.na22989.miniurl.model.entity.Link">
+    <!--@mbg.generated-->
+    <!--@Table link-->
+    <id column="id" jdbcType="BIGINT" property="id" />
+    <result column="short_code" jdbcType="VARCHAR" property="shortCode" />
+    <result column="long_url" jdbcType="VARCHAR" property="longUrl" />
+    <result column="user_id" jdbcType="BIGINT" property="userId" />
+    <result column="expire_time" jdbcType="TIMESTAMP" property="expireTime" />
+    <result column="click_count" jdbcType="INTEGER" property="clickCount" />
+    <result column="create_time" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="update_time" jdbcType="TIMESTAMP" property="updateTime" />
+  </resultMap>
+  <sql id="Base_Column_List">
+    <!--@mbg.generated-->
+    id, short_code, long_url, user_id, expire_time, click_count, create_time, update_time
+  </sql>
+
+  <update id="batchUpdateClickCount">
+    UPDATE link
+    SET click_count = click_count +
+    CASE short_code
+    <foreach collection="list" item="item" separator=" ">
+      WHEN #{item.shortCode} THEN #{item.clickCount}
+    </foreach>
+    ELSE 0
+    END
+    WHERE short_code IN
+    <foreach collection="list" item="item" open="(" close=")" separator=",">
+      #{item.shortCode}
+    </foreach>
+  </update>
+</mapper>

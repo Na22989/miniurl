@@ -1,0 +1,15 @@
+$kind: http-request
+url: "{{baseUrl}}/api/link/detail/{{linkId}}"
+method: GET
+headers:
+  Authorization: Bearer {{token}}
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('查看自己的短链成功', function () {
+          var json = pm.response.json();
+          pm.expect(json.code).to.eql(20000);
+          pm.expect(json.data.id).to.eql(pm.collectionVariables.get('linkId'));
+      });
+    language: text/javascript
+order: 1000

@@ -1,0 +1,11 @@
+$kind: http-request
+name: redirect
+url: "{{baseUrl}}/s/:shortCode"
+method: GET
+pathVariables:
+  - key: shortCode
+    value: 6b51hueSJO
+    description: ""
+settings: {}
+examples: ./.resources/redirect.resources/examples
+order: 1000

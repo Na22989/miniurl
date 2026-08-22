@@ -1,0 +1,20 @@
+$kind: http-request
+url: "{{baseUrl}}/api/link/create"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{token}}
+body:
+  type: text
+  content: |-
+    {
+      "longUrl": ""
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('空URL应返回 40000', function () {
+          pm.expect(pm.response.json().code).to.eql(40000);
+      });
+    language: text/javascript
+order: 3000

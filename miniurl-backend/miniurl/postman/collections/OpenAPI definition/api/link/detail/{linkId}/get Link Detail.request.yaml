@@ -1,0 +1,10 @@
+$kind: http-request
+url: "{{baseUrl}}/api/link/detail/:linkId"
+method: GET
+headers:
+  Accept: "*/*"
+pathVariables:
+  linkId: "7391"
+settings: {}
+examples: ./.resources/get Link Detail.resources/examples
+order: 1000

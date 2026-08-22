@@ -1,0 +1,24 @@
+$kind: http-request
+url: "{{baseUrl}}/api/user/login"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "username": "{{testUsername}}",
+      "password": "123456"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('登录成功，返回 token', function () {
+          var json = pm.response.json();
+          pm.expect(json.code).to.eql(20000);
+          pm.expect(json.data.token).to.be.a('string');
+          // 存储 token 到集合变量，后续所有请求自动携带
+          pm.collectionVariables.set('token', json.data.token);
+      });
+    language: text/javascript
+order: 2000

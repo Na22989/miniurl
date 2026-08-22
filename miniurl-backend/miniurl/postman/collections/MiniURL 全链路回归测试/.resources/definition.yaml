@@ -1,0 +1,9 @@
+$kind: collection
+name: MiniURL 全链路回归测试
+description: Week 1 验收 — 15个场景覆盖注册、登录、鉴权、短链CRUD、302跳转
+variables:
+  baseUrl: http://localhost:9191
+  token: ""
+  shortCode: ""
+  linkId: ""
+  testUsername: regression_test_user

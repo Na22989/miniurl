@@ -1,0 +1,13 @@
+$kind: http-request
+url: "{{baseUrl}}/api/link/detail/{{linkId}}"
+method: GET
+headers:
+  Authorization: Bearer {{token}}
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('已删除的短链应返回 42100', function () {
+          pm.expect(pm.response.json().code).to.eql(42100);
+      });
+    language: text/javascript
+order: 2000

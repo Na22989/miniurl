@@ -1,0 +1,9 @@
+$kind: collection
+name: OpenAPI definition
+description: ""
+variables:
+  baseUrl: http://localhost:9191
+auth:
+  type: bearer
+  credentials:
+    token: "{{accessToken}}"

@@ -1,0 +1,16 @@
+$kind: http-request
+url: "{{baseUrl}}/api/link/list"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: "{}"
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('无Token分页应返回 40100', function () {
+          pm.expect(pm.response.json().code).to.eql(40100);
+      });
+    language: text/javascript
+order: 4000

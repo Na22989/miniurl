@@ -1,0 +1,16 @@
+$kind: http-request
+url: "{{baseUrl}}/api/link/create"
+method: POST
+headers:
+  Content-Type: application/json
+  Accept: "*/*"
+body:
+  type: json
+  content: |-
+    {
+      "longUrl": "string",
+      "expireTime": "1979-09-14T09:08:13.555Z"
+    }
+settings: {}
+examples: ./.resources/create Link.resources/examples
+order: 1000

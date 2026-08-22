@@ -1,0 +1,8 @@
+$kind: http-request
+url: "{{baseUrl}}/api/user/logout"
+method: POST
+headers:
+  Accept: "*/*"
+settings: {}
+examples: ./.resources/logout.resources/examples
+order: 1000

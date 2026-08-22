@@ -1,0 +1,16 @@
+$kind: http-request
+name: "[TC-04] /me 带Token → 20000"
+url: "{{baseUrl}}/api/user/me"
+method: GET
+headers:
+  Authorization: Bearer {{token}}
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('/me 应返回 20000 + 用户信息', function () {
+          var json = pm.response.json();
+          pm.expect(json.code).to.eql(20000);
+          pm.expect(json.data.username).to.eql(pm.collectionVariables.get('testUsername'));
+      });
+    language: text/javascript
+order: 4000

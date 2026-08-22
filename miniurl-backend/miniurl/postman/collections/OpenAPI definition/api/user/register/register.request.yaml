@@ -1,0 +1,17 @@
+$kind: http-request
+url: "{{baseUrl}}/api/user/register"
+method: POST
+headers:
+  Content-Type: application/json
+  Accept: "*/*"
+body:
+  type: json
+  content: |-
+    {
+      "username": "string",
+      "password": "string",
+      "nickname": "string"
+    }
+settings: {}
+examples: ./.resources/register.resources/examples
+order: 1000

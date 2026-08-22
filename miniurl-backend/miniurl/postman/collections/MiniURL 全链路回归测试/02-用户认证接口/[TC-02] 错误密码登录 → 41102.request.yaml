@@ -1,0 +1,20 @@
+$kind: http-request
+url: "{{baseUrl}}/api/user/login"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "username": "{{testUsername}}",
+      "password": "wrong_password"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('错误密码应返回 41102', function () {
+          pm.expect(pm.response.json().code).to.eql(41102);
+      });
+    language: text/javascript
+order: 2000

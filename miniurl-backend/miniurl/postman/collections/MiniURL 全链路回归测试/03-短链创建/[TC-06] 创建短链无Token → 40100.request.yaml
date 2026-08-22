@@ -1,0 +1,19 @@
+$kind: http-request
+url: "{{baseUrl}}/api/link/create"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "longUrl": "https://www.example.com"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('无Token创建应返回 40100', function () {
+          pm.expect(pm.response.json().code).to.eql(40100);
+      });
+    language: text/javascript
+order: 2000

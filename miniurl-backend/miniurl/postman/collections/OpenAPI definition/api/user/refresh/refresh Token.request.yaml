@@ -1,0 +1,93 @@
+$kind: http-request
+name: refresh Token
+url: "{{baseUrl}}/api/user/refresh"
+method: POST
+headers:
+  Content-Type: application/json
+  Accept: "*/*"
+body:
+  type: json
+  content: |-
+    {
+      "refreshToken": "{{refreshToken}}"
+    }
+scripts:
+  - type: beforeRequest
+    code: ""
+    language: text/javascript
+  - type: afterResponse
+    code: "// ============================================================\r
+
+      // 刷新 Token 接口响应处理\r
+
+      // 接口：/api/user/refresh\r
+
+      // 请求体：{ refreshToken: \"xxx\" }\r
+
+      // 响应：{ code: 20000, data: { accessToken: \"new_token\" } }\r
+
+      // ============================================================\r
+
+      \r
+
+      // 1. 解析响应\r
+
+      const response = pm.response.json();\r
+
+      \r
+
+      // 2. 检查响应是否成功\r
+
+      if (response.code === 20000 && response.data?.accessToken) {\r
+
+      \    const newAccessToken = response.data.accessToken;\r
+
+      \r
+
+      \    // ---------- 更新 accessToken ----------\r
+
+      \    pm.environment.set(\"accessToken\", newAccessToken);\r
+
+      \r
+
+      \    // ---------- 控制台日志 ----------\r
+
+      \    console.log(\"🔄 Token 刷新成功！\");\r
+
+      \    console.log(`   新 Token: ${newAccessToken.substring(0, 20)}...`);\r
+
+      \r
+
+      \    // 可选：如果有新 refreshToken，也更新（但你的接口没有返回）\r
+
+      \    // pm.environment.set(\"refreshToken\", response.data.refreshToken);\r
+
+      \r
+
+      } else {\r
+
+      \    // 刷新失败（Token 过期或无效）\r
+
+      \    console.error(\"❌ Token 刷新失败：\", response.message || \"未知错误\");\r
+
+      \r
+
+      \    // 清理所有认证信息，强制重新登录\r
+
+      \    pm.environment.unset(\"accessToken\");\r
+
+      \    pm.environment.unset(\"refreshToken\");\r
+
+      \    pm.environment.unset(\"authHeader\");\r
+
+      \r
+
+      \    // 可选：抛出错误，让 Postman 测试失败\r
+
+      \    throw new Error(`Token 刷新失败，请重新登录: ${response.message || ''}`);\r
+
+      }"
+    language: text/javascript
+settings: {}
+examples: ./.resources/refresh Token.resources/examples
+order: 1000

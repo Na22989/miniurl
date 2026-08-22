@@ -1,0 +1,762 @@
+{
+  "info": {
+    "name": "MiniURL 全链路回归测试",
+    "description": "Week 1 验收 — 15个场景覆盖注册、登录、鉴权、短链CRUD、302跳转",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:9191"
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "shortCode",
+      "value": ""
+    },
+    {
+      "key": "linkId",
+      "value": ""
+    },
+    {
+      "key": "testUsername",
+      "value": "regression_test_user"
+    }
+  ],
+  "item": [
+    {
+      "name": "01-准备：清理与注册",
+      "description": "创建测试用户并获取 token，为后续所有用例提供认证凭据",
+      "item": [
+        {
+          "name": "注册测试用户",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('注册成功或用户名已存在', function () {",
+                  "    pm.expect(pm.response.json().code).to.be.oneOf([20000, 41100]);",
+                  "});",
+                  "// 保存用户名供后续使用",
+                  "pm.collectionVariables.set('testUsername', 'regression_test_user');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{testUsername}}\",\n  \"password\": \"123456\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/user/register", "host": ["{{baseUrl}}"], "path": ["api", "user", "register"] }
+          }
+        },
+        {
+          "name": "登录获取 Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('登录成功，返回 token', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.code).to.eql(20000);",
+                  "    pm.expect(json.data.token).to.be.a('string');",
+                  "    // 存储 token 到集合变量，后续所有请求自动携带",
+                  "    pm.collectionVariables.set('token', json.data.token);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{testUsername}}\",\n  \"password\": \"123456\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/user/login", "host": ["{{baseUrl}}"], "path": ["api", "user", "login"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "02-用户认证接口",
+      "description": "注册/登录/获取当前用户",
+      "item": [
+        {
+          "name": "[TC-01] 重复注册 → 41100",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('重复注册应返回 41100 用户名已存在', function () {",
+                  "    pm.expect(pm.response.json().code).to.eql(41100);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{testUsername}}\",\n  \"password\": \"123456\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/user/register", "host": ["{{baseUrl}}"], "path": ["api", "user", "register"] }
+          }
+        },
+        {
+          "name": "[TC-02] 错误密码登录 → 41102",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('错误密码应返回 41102', function () {",
+                  "    pm.expect(pm.response.json().code).to.eql(41102);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{testUsername}}\",\n  \"password\": \"wrong_password\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/user/login", "host": ["{{baseUrl}}"], "path": ["api", "user", "login"] }
+          }
+        },
+        {
+          "name": "[TC-03] /me 无Token → 40100",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('无Token应返回 40100', function () {",
+                  "    pm.expect(pm.response.json().code).to.eql(40100);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/user/me", "host": ["{{baseUrl}}"], "path": ["api", "user", "me"] }
+          }
+        },
+        {
+          "name": "[TC-04] /me 带Token → 20000",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('/me 应返回 20000 + 用户信息', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.code).to.eql(20000);",
+                  "    pm.expect(json.data.username).to.eql(pm.collectionVariables.get('testUsername'));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{baseUrl}}/api/user/me", "host": ["{{baseUrl}}"], "path": ["api", "user", "me"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "03-短链创建",
+      "description": "创建短链，校验参数和鉴权",
+      "item": [
+        {
+          "name": "[TC-05] 创建短链正常 → 20000",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('创建短链成功', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.code).to.eql(20000);",
+                  "    pm.expect(json.data.shortCode).to.be.a('string');",
+                  "    // 存储 shortCode 和 linkId 供后续用例使用",
+                  "    pm.collectionVariables.set('shortCode', json.data.shortCode);",
+                  "    pm.collectionVariables.set('linkId', json.data.id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"longUrl\": \"https://www.baidu.com\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/link/create", "host": ["{{baseUrl}}"], "path": ["api", "link", "create"] }
+          }
+        },
+        {
+          "name": "[TC-06] 创建短链无Token → 40100",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('无Token创建应返回 40100', function () {",
+                  "    pm.expect(pm.response.json().code).to.eql(40100);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"longUrl\": \"https://www.example.com\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/link/create", "host": ["{{baseUrl}}"], "path": ["api", "link", "create"] }
+          }
+        },
+        {
+          "name": "[TC-07] 空URL校验 → 40000",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('空URL应返回 40000', function () {",
+                  "    pm.expect(pm.response.json().code).to.eql(40000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"longUrl\": \"\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/link/create", "host": ["{{baseUrl}}"], "path": ["api", "link", "create"] }
+          }
+        },
+        {
+          "name": "[TC-08] 非法URL校验 → 40000",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('非http/https URL应返回 40000', function () {",
+                  "    pm.expect(pm.response.json().code).to.eql(40000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"longUrl\": \"not-a-url\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/link/create", "host": ["{{baseUrl}}"], "path": ["api", "link", "create"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "04-短链分页列表",
+      "description": "测试分页参数校验和正常查询",
+      "item": [
+        {
+          "name": "[TC-09] 默认分页 → 20000 + records",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('分页列表正常返回', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.code).to.eql(20000);",
+                  "    pm.expect(json.data.records).to.be.an('array');",
+                  "    pm.expect(json.data.total).to.be.at.least(1);",
+                  "    pm.expect(json.data.current).to.eql(1);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{}" },
+            "url": { "raw": "{{baseUrl}}/api/link/list", "host": ["{{baseUrl}}"], "path": ["api", "link", "list"] }
+          }
+        },
+        {
+          "name": "[TC-10] 分页参数 current=0 → 40000",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('current=0 应返回 40000', function () {",
+                  "    pm.expect(pm.response.json().code).to.eql(40000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"current\": 0}" },
+            "url": { "raw": "{{baseUrl}}/api/link/list", "host": ["{{baseUrl}}"], "path": ["api", "link", "list"] }
+          }
+        },
+        {
+          "name": "[TC-11] size超限 → 40000",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('size=100 应返回 40000', function () {",
+                  "    pm.expect(pm.response.json().code).to.eql(40000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"size\": 100}" },
+            "url": { "raw": "{{baseUrl}}/api/link/list", "host": ["{{baseUrl}}"], "path": ["api", "link", "list"] }
+          }
+        },
+        {
+          "name": "[TC-12] 列表无Token → 40100",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('无Token分页应返回 40100', function () {",
+                  "    pm.expect(pm.response.json().code).to.eql(40100);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{}" },
+            "url": { "raw": "{{baseUrl}}/api/link/list", "host": ["{{baseUrl}}"], "path": ["api", "link", "list"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "05-短链详情",
+      "description": "查看详情、越权安全测试",
+      "item": [
+        {
+          "name": "[TC-13] 查看自己的短链 → 20000",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('查看自己的短链成功', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.code).to.eql(20000);",
+                  "    pm.expect(json.data.id).to.eql(pm.collectionVariables.get('linkId'));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{baseUrl}}/api/link/detail/{{linkId}}", "host": ["{{baseUrl}}"], "path": ["api", "link", "detail", "{{linkId}}"] }
+          }
+        },
+        {
+          "name": "[TC-14] 不存在的ID → 42100",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('不存在ID应返回 42100', function () {",
+                  "    pm.expect(pm.response.json().code).to.eql(42100);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{baseUrl}}/api/link/detail/99999999999999", "host": ["{{baseUrl}}"], "path": ["api", "link", "detail", "99999999999999"] }
+          }
+        },
+        {
+          "name": "[TC-15] 越权访问（安全）→ 42100",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// 此用例需手动填充另一个用户的 linkId",
+                  "// 预期：不能区分\"不存在\"和\"不属于我\"，统一返回 42100",
+                  "pm.test('越权应返回 42100（不暴露存在性）', function () {",
+                  "    pm.expect(pm.response.json().code).to.eql(42100);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "body": { "mode": "raw", "raw": "" },
+            "url": {
+              "raw": "{{baseUrl}}/api/link/detail/75971381506050",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "link", "detail", "75971381506050"],
+              "description": "⚠️ 手动替换为其他用户的 linkId"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "06-短链删除",
+      "description": "删除短链及安全测试",
+      "item": [
+        {
+          "name": "[TC-16] 删除正常 → 20000",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('删除成功', function () {",
+                  "    pm.expect(pm.response.json().code).to.eql(20000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"id\": {{linkId}}\n}" },
+            "url": { "raw": "{{baseUrl}}/api/link/delete", "host": ["{{baseUrl}}"], "path": ["api", "link", "delete"] }
+          }
+        },
+        {
+          "name": "[TC-17] 删除后再次详情 → 42100",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('已删除的短链应返回 42100', function () {",
+                  "    pm.expect(pm.response.json().code).to.eql(42100);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{baseUrl}}/api/link/detail/{{linkId}}", "host": ["{{baseUrl}}"], "path": ["api", "link", "detail", "{{linkId}}"] }
+          }
+        },
+        {
+          "name": "[TC-18] 删除不存在ID → 42100",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('删除不存在ID应返回 42100', function () {",
+                  "    pm.expect(pm.response.json().code).to.eql(42100);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"id\": 99999999999999\n}" },
+            "url": { "raw": "{{baseUrl}}/api/link/delete", "host": ["{{baseUrl}}"], "path": ["api", "link", "delete"] }
+          }
+        },
+        {
+          "name": "[TC-19] 删除 id=0 → 40000",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('id=0 应返回 40000', function () {",
+                  "    pm.expect(pm.response.json().code).to.eql(40000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"id\": 0\n}" },
+            "url": { "raw": "{{baseUrl}}/api/link/delete", "host": ["{{baseUrl}}"], "path": ["api", "link", "delete"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "07-302跳转",
+      "description": "短链跳转，公开接口无需鉴权",
+      "item": [
+        {
+          "name": "[TC-20] 302跳转正常",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// 创建一条新短链用于跳转测试",
+                  "var createReq = {",
+                  "  url: pm.collectionVariables.get('baseUrl') + '/api/link/create',",
+                  "  method: 'POST',",
+                  "  header: {",
+                  "    'Content-Type': 'application/json',",
+                  "    'Authorization': 'Bearer ' + pm.collectionVariables.get('token')",
+                  "  },",
+                  "  body: { mode: 'raw', raw: JSON.stringify({longUrl: 'https://www.baidu.com'}) }",
+                  "};",
+                  "",
+                  "pm.sendRequest(createReq, function (err, res) {",
+                  "    if (err) { pm.expect.fail('创建测试短链失败: ' + err); return; }",
+                  "    var code = res.json().data.shortCode;",
+                  "    // 访问短链，禁止自动重定向",
+                  "    pm.sendRequest({",
+                  "        url: pm.collectionVariables.get('baseUrl') + '/s/' + code,",
+                  "        method: 'GET',",
+                  "        followRedirects: false",
+                  "    }, function (err2, res2) {",
+                  "        if (err2) { pm.expect.fail('跳转请求失败: ' + err2); return; }",
+                  "        pm.test('跳转应返回 302, Location指向百度', function () {",
+                  "            pm.expect(res2.code).to.eql(302);",
+                  "            pm.expect(res2.headers.location).to.eql('https://www.baidu.com');",
+                  "        });",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/s/{{shortCode}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["s", "{{shortCode}}"],
+              "description": "⚠️ 此用例由 test script 动态创建短链并验证 302，直接点 Send 无意义。正确用法是看 folder 级别 Runner 中不会跳过。"
+            }
+          }
+        },
+        {
+          "name": "[TC-21] 跳转不存在短链 → 42100",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('不存在的短链应返回 42100', function () {",
+                  "    pm.expect(pm.response.json().code).to.eql(42100);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/s/abcdefgh", "host": ["{{baseUrl}}"], "path": ["s", "abcdefgh"] }
+          }
+        },
+        {
+          "name": "[TC-22] 跳转过期短链 → 42101",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// 创建一条已过期的短链",
+                  "var expiredReq = {",
+                  "  url: pm.collectionVariables.get('baseUrl') + '/api/link/create',",
+                  "  method: 'POST',",
+                  "  header: {",
+                  "    'Content-Type': 'application/json',",
+                  "    'Authorization': 'Bearer ' + pm.collectionVariables.get('token')",
+                  "  },",
+                  "  body: { mode: 'raw', raw: JSON.stringify({",
+                  "    longUrl: 'https://www.example.com',",
+                  "    expireTime: '2020-01-01T00:00:00'",
+                  "  }) }",
+                  "};",
+                  "",
+                  "pm.sendRequest(expiredReq, function (err, res) {",
+                  "    if (err) { pm.expect.fail('创建过期短链失败: ' + err); return; }",
+                  "    var code = res.json().data.shortCode;",
+                  "    pm.sendRequest(",
+                  "        pm.collectionVariables.get('baseUrl') + '/s/' + code,",
+                  "        function (err2, res2) {",
+                  "            if (err2) { pm.expect.fail('跳转请求失败: ' + err2); return; }",
+                  "            pm.test('过期短链应返回 42101', function () {",
+                  "                pm.expect(res2.json().code).to.eql(42101);",
+                  "            });",
+                  "        }",
+                  "    );",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/s/expired",
+              "host": ["{{baseUrl}}"],
+              "path": ["s", "expired"],
+              "description": "⚠️ 由 test script 动态创建过期短链并验证"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "08-异常处理覆盖",
+      "description": "测试 GlobalExceptionHandler 新增的异常类型",
+      "item": [
+        {
+          "name": "[TC-23] JSON格式错误 → 40000",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('畸形JSON应返回 40000 请求体格式错误', function () {",
+                  "    pm.expect(pm.response.json().code).to.eql(40000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"longUrl\": \"https://example.com\""
+            },
+            "url": { "raw": "{{baseUrl}}/api/link/create", "host": ["{{baseUrl}}"], "path": ["api", "link", "create"] }
+          }
+        }
+      ]
+    }
+  ]
+}

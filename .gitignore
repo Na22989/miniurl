@@ -1,0 +1,56 @@
+# ============================================================
+# MiniURL 仓库根 .gitignore
+# 说明：后端项目自身还有 miniurl-backend/miniurl/.gitignore（target/、.idea 等），
+#       本文件负责根目录级别的杂物排除，两者叠加生效。
+#
+# 入库原则：只进代码 + 测试脚本 + 项目运行必需；
+#           设计文档（docs/、PRD、TECH_DESIGN、CLAUDE.md 等）最后阶段统一重写后再入库。
+# ============================================================
+
+# ---------- 依赖 / 二进制 ----------
+# jar/：本地下载的依赖 jar 副本（87M），不入库
+jar/
+
+# ---------- 设计文档（最后阶段统一重写，暂不入库） ----------
+docs/
+PRD.md
+TECH_DESIGN.md
+ERROR_CODE.md
+WEEK1_PLAN.md
+CLAUDE.md
+# NetUtil 安全审计相关文档（同 docs/ 待遇）
+miniurl-backend/miniurl/BUG_FIX_PATCH.md
+miniurl-backend/miniurl/EXECUTIVE_SUMMARY.md
+miniurl-backend/miniurl/SECURITY_AUDIT_NetUtil.md
+
+# ---------- Linux 学习练习环境（非项目代码） ----------
+linux-lab/
+
+# ---------- JMeter 压测（保留脚本和输入，忽略结果输出） ----------
+# 保留入库：*.sh 场景脚本、*.jmx 测试计划、shortcodes*.csv（输入数据）
+# 以下为压测结果汇总 CSV（含 33M 的 scene03 结果），属生成物，忽略
+JmeterTest/Summary_*.csv
+JmeterTest/summary*.csv
+
+# ---------- 运行日志 ----------
+# 应用本地启动会写 logs/miniurl.log
+logs/
+**/logs/
+
+# ---------- IDE / 编辑器 ----------
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.settings/
+.project
+.classpath
+
+# ---------- OS ----------
+.DS_Store
+Thumbs.db
+
+# ---------- Claude Code 本地配置 ----------
+# settings.local.json 是本机专属（权限/环境），不入库；共享的 settings.json 如出现则正常提交
+**/.claude/settings.local.json

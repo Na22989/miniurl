@@ -1,0 +1,36 @@
+$kind: http-example
+request:
+  url: "{{baseUrl}}/api/link/create"
+  method: POST
+  headers:
+    Content-Type: application/json
+    Accept: "*/*"
+  body:
+    type: json
+    content: |-
+      {
+        "longUrl": "string",
+        "expireTime": "1979-09-14T09:08:13.555Z"
+      }
+response:
+  statusCode: 200
+  statusText: OK
+  headers:
+    Content-Type: "*/*"
+  body:
+    type: text
+    content: |-
+      {
+        "code": 5429,
+        "message": "string",
+        "data": {
+          "id": 6365,
+          "shortCode": "string",
+          "shortUrl": "string",
+          "longUrl": "string",
+          "userId": 3736,
+          "expireTime": "2005-10-09T18:32:00.481Z",
+          "createTime": "1998-05-25T09:18:39.471Z"
+        }
+      }
+order: 1000

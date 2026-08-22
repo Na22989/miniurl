@@ -1,0 +1,101 @@
+logging:
+  file:
+    name: logs/miniurl.log
+
+spring:
+  application.name: miniurl
+  # 时区对齐 Asia/Shanghai（与 MySQL 一致）：Jackson 序列化 Date 时按 +08:00 输出，
+  # 配合 Dockerfile 的 -Duser.timezone 与 compose 的 TZ 三处一致
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Shanghai
+#  mvc:
+#    servlet:
+#      path: /api
+  profiles:
+    active: local
+  # DataSource Config
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/miniurl_db?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&rewriteBatchedStatements=true
+    username: root
+    password: root
+  data:
+    # Redis 配置
+    redis:
+      database: 0
+      host: localhost
+      password: root
+      timeout: 5000
+      port: 6379
+      lettuce:
+        pool:
+          max-active: 8      # 最大连接数
+          max-idle: 8        # 最大空闲连接
+          min-idle: 0        # 最小空闲连接
+          max-wait: -1ms     # 获取连接最大等待时间（-1=无限）
+# mybatis-plus
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: false
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+# springdoc-openapi项目配置
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+server:
+  port: 9191
+jwt:
+  # 秘钥
+  secret: SNwdqyha1vMAPrHX/OXuq4nnoLP2+fzuP5RHnVApWcg=
+  # 过期时间：7天 (单位毫秒)
+  refresh-expiration: 604800000
+  # 刷新时间：30分钟 (单位毫秒)
+  access-expiration: 1800000
+
+# 限流配置
+rate-limit:
+  enabled: true                 # 是否启用限流（默认 true）
+  tokens-per-second: 1000       # 令牌生成速率（个/秒）
+  max-tokens: 100               # 桶容量上限（突发流量支持）
+  proxies-to-trust: 1           # 可信代理层级（1=穿透一层代理取客户端 IP，配合 Nginx）
+  user:
+    enabled: true               # 是否启用用户限流（默认 true）
+    window-ms: 60000            # 滑动窗口长度（毫秒）
+    max-requests: 50            # 滑动窗口请求上限
+
+# MiniURL 服务配置
+miniurl:
+  # 短链返回给客户端的对外地址（部署事实，不是请求上下文）：
+  #   - 本地开发：http://localhost:9191（点短链的人 = 服务器本机）
+  #   - VM 模拟生产：填 VM 静态 IP，如 http://192.168.x.x:9191
+  #   - nginx 反代后：填 https://域名 或 http://服务器IP
+  # 部署时用环境变量 MINIURL_BASE_URL 覆盖（docker-compose 已配置）
+  base-url: http://localhost:9191
+  security:
+    # 可信代理白名单（支持精确 IP 与 CIDR 段）：
+    #   127.0.0.1       —— 本地开发直连
+    #   172.16.0.0/12   —— Docker bridge / compose 内网：nginx 容器 IP 每次重建都变，按网段信任
+    # ⚠️ 公网部署务必收紧：只留你自己的代理 IP，172.16/12 会信任所有内网主机
+    trusted-proxies:
+      - 127.0.0.1
+      - 172.16.0.0/12
+    # strict-mode=true：检测到非可信源伪造 X-Real-IP/X-Forwarded-For 直接抛异常拒绝
+    strict-mode: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      application: miniurl
+

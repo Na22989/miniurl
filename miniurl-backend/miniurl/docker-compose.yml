@@ -1,0 +1,115 @@
+# ============================================================
+# MiniURL docker-compose — MySQL + Redis + App 一键编排
+#
+# 使用：
+#   docker compose up -d --build          # 一键构建 + 后台启动三容器
+#   docker compose ps                      # 查看三容器状态（均应 Up + healthy）
+#   docker compose logs -f miniurl-app     # 跟随应用日志
+#   docker compose down                    # 停止并移除容器（不删数据卷）
+#
+# ============================================================
+
+services:
+
+  # ---------- MySQL 8.0 ----------
+  mysql:
+    image: mysql:8.0
+    container_name: miniurl-mysql
+    restart: unless-stopped
+    environment:
+      # 密码必须与 application.yml 的 datasource.password 一致（root/root）
+      MYSQL_ROOT_PASSWORD: root
+      # create_table.sql 里只有 CREATE TABLE、没有 CREATE DATABASE。
+      # MySQL 官方镜像会用 MYSQL_DATABASE 自动建库，initdb 脚本就建在这个库上
+      MYSQL_DATABASE: miniurl_db
+      TZ: Asia/Shanghai                # 对齐 JDBC URL 里的 serverTimezone
+    ports:
+      - "3306:3306"                    # 映射出来，开发期可用 Navicat/命令行直连
+    volumes:
+      # 数据持久化：容器删除/重建不丢库
+      - mysql-data:/var/lib/mysql
+      # 首次启动自动建表（仅当数据卷为空时执行一次，已初始化过的卷不会再跑）
+      # :ro = 容器内只读，防止容器误改宿主机脚本
+      - ./sql/create_table.sql:/docker-entrypoint-initdb.d/01-create-tables.sql:ro
+    healthcheck:
+      # 必须用 CMD-SHELL：$$ 经 compose 变成 $ 后交给 shell 展开 $MYSQL_ROOT_PASSWORD。
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s               # 首次初始化（建库建表）较慢，先给它缓冲期
+
+  # ---------- Redis 7 ----------
+  redis:
+    image: redis:7
+    container_name: miniurl-redis
+    restart: unless-stopped
+    # --requirepass root 对齐 application.yml 的 redis.password；
+    # --appendonly yes 开启 AOF，重启不丢缓存（配合 /data 数据卷）
+    command: ["redis-server", "--requirepass", "root", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data               # AOF 持久化
+    healthcheck:
+      # 必须带 -a root 认证：裸 redis-cli ping 在 NOAUTH 时虽报错但退出码是 0，
+      test: ["CMD", "redis-cli", "-a", "root", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: miniurl-prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports: [ "9090:9090" ]
+    depends_on:
+      # 只保证启动顺序：镜像未装 curl 配不了 healthcheck；Prometheus 抓取失败会自动重试，app 起来就有数据
+      - miniurl-app
+  grafana:
+    image: grafana/grafana:latest
+    container_name: miniurl-grafana
+    environment: { GF_SECURITY_ADMIN_PASSWORD: admin }
+    ports: [ "3000:3000" ]
+
+  # ---------- MiniURL 应用 ----------
+  miniurl-app:
+    build:
+      context: .                      # 复用项目根目录的 Dockerfile（多阶段构建）
+      dockerfile: Dockerfile
+    image: miniurl-app:latest         # 给构建产物固定 tag，后续可用 up（不重复构建）
+    container_name: miniurl-app
+    restart: unless-stopped
+    ports:
+      - "9191:9191"
+    environment:
+      # 时区对齐：JVM 默认 UTC，和 MySQL（Asia/Shanghai）差 8 小时会错位
+      #（expireTime 过期判断、link_access_log 的 access_time、趋势查询窗口）。Dockerfile 还加了 -Duser.timezone 双保险
+      TZ: Asia/Shanghai
+      # 覆盖 application.yml 里写死的 localhost → 换成 compose 服务名。
+      # 容器内 localhost 指容器自己，只有服务名能在 compose 网络里互通
+      SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/miniurl_db?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&rewriteBatchedStatements=true"
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: "6379"
+      SPRING_DATA_REDIS_PASSWORD: root
+      # 短链返回给客户端的对外地址（Spring 宽松绑定 → miniurl.base-url）：
+      # 开发默认 localhost:9191；VM 部署改成 VM 静态 IP；nginx 反代后改成 https://域名
+      MINIURL_BASE_URL: http://localhost:9191
+
+    depends_on:
+      # 等依赖 healthcheck 通过（service_healthy）再启动应用，避免应用一启动就连库失败
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # 说明：应用已引入 actuator（/actuator/health 可探活），但镜像未装 curl，故未配 healthcheck；
+    # 应用日志写到容器内 /app/logs/miniurl.log（Dockerfile WORKDIR=/app，appuser 有写权限）
+
+# 具名数据卷（docker volume ls 可查看；docker compose down 不会删除卷）
+volumes:
+  mysql-data:
+  redis-data:
+

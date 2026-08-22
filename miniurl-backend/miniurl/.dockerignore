@@ -1,0 +1,31 @@
+# ===== 构建产物 =====
+# 本地 mvn 编译产物；builder 阶段会重新 clean package，绝不能把旧产物带进上下文
+target/
+
+# ===== 版本控制 =====
+.git/
+.gitattributes
+.gitignore
+
+# ===== IDE / 编辑器 =====
+.idea/
+.vscode/
+*.iml
+
+# ===== 本地工具 / 缓存 =====
+.claude/
+.postman/
+postman/
+
+# ===== 运行时日志 =====
+logs/
+
+# ===== 文档 & SQL（不参与编译，不打进 jar）=====
+docs/
+sql/
+*.md
+
+# ===== Maven Wrapper（镜像内用 mvn 命令，不用本地 mvnw）=====
+.mvn/
+mvnw
+mvnw.cmd

@@ -1,0 +1,121 @@
+$kind: http-request
+name: login
+url: "{{baseUrl}}/api/user/login"
+method: POST
+headers:
+  Content-Type: application/json
+  Accept: "*/*"
+body:
+  type: json
+  content: |-
+    {
+      "username": "test01",
+      "password": "123456"
+    }
+scripts:
+  - type: afterResponse
+    code: "// ============================================================\r
+
+      // 登录接口响应处理脚本\r
+
+      // 功能：\r
+
+      //   1. 提取 accessToken → 保存为环境变量（用于 Authorization 头）\r
+
+      //   2. 提取 refreshToken → 保存为环境变量（用于刷新接口）\r
+
+      //   3. 提取 userInfo → 保存为环境变量（可选）\r
+
+      //   4. 自动设置请求头的 Authorization\r
+
+      // ============================================================\r
+
+      \r
+
+      // 1. 解析响应 JSON\r
+
+      const response = pm.response.json();\r
+
+      \r
+
+      // 2. 检查响应是否成功（code === 20000）\r
+
+      if (response.code === 20000 && response.data) {\r
+
+      \    const { accessToken, refreshToken, userInfo } = response.data;\r
+
+      \r
+
+      \    // ---------- 保存 Token ----------\r
+
+      \    // 保存 accessToken（用于后续请求的 Authorization 头）\r
+
+      \    pm.environment.set(\"accessToken\", accessToken);\r
+
+      \r
+
+      \    // 保存 refreshToken（用于刷新续约）\r
+
+      \    pm.environment.set(\"refreshToken\", refreshToken);\r
+
+      \r
+
+      \    // ---------- 保存用户信息（可选） ----------\r
+
+      \    if (userInfo) {\r
+
+      \        pm.environment.set(\"userId\", userInfo.id);\r
+
+      \        pm.environment.set(\"username\", userInfo.username);\r
+
+      \        pm.environment.set(\"nickname\", userInfo.nickname);\r
+
+      \    }\r
+
+      \r
+
+      \    // ---------- 控制台日志（调试用） ----------\r
+
+      \    console.log(\"✅ 登录成功！\");\r
+
+      \    console.log(`   User: ${userInfo?.username || 'Unknown'}`);\r
+
+      \    console.log(`   Token: ${accessToken.substring(0, 20)}...`);\r
+
+      \    console.log(`   Refresh: ${refreshToken.substring(0, 20)}...`);\r
+
+      \r
+
+      \    // 可选：在 Postman 弹窗提示（慎用，会阻塞）\r
+
+      \    // pm.notify(\"登录成功！\");\r
+
+      \r
+
+      } else {\r
+
+      \    // 登录失败处理\r
+
+      \    console.error(\"❌ 登录失败：\", response.message || \"未知错误\");\r
+
+      \r
+
+      \    // 清理可能残留的旧 Token\r
+
+      \    pm.environment.unset(\"accessToken\");\r
+
+      \    pm.environment.unset(\"refreshToken\");\r
+
+      \    pm.environment.unset(\"authHeader\");\r
+
+      \r
+
+      \    // 可选：抛出错误，让 Postman 测试失败\r
+
+      \    throw new Error(`登录失败: ${response.message || '请检查账号密码'}`);\r
+
+      }"
+    language: text/javascript
+settings: {}
+examples: ./.resources/login.resources/examples
+order: 1000

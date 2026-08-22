@@ -1,0 +1,53 @@
+$kind: http-example
+request:
+  url: "{{baseUrl}}/api/link/list"
+  method: POST
+  headers:
+    Content-Type: application/json
+    Accept: "*/*"
+  body:
+    type: json
+    content: |-
+      {
+        "current": 9101,
+        "size": 37
+      }
+response:
+  statusCode: 200
+  statusText: OK
+  headers:
+    Content-Type: "*/*"
+  body:
+    type: text
+    content: |-
+      {
+        "code": 6027,
+        "message": "string",
+        "data": {
+          "records": [
+            {
+              "id": 1152,
+              "shortCode": "string",
+              "shortUrl": "string",
+              "longUrl": "string",
+              "userId": 9209,
+              "expireTime": "2024-06-07T18:24:52.527Z",
+              "createTime": "2012-10-27T00:13:12.327Z"
+            },
+            {
+              "id": 1675,
+              "shortCode": "string",
+              "shortUrl": "string",
+              "longUrl": "string",
+              "userId": 6289,
+              "expireTime": "1947-03-12T14:51:48.620Z",
+              "createTime": "1964-03-08T02:14:04.289Z"
+            }
+          ],
+          "total": 7252,
+          "current": 6306,
+          "size": 2629,
+          "pages": 3852
+        }
+      }
+order: 1000

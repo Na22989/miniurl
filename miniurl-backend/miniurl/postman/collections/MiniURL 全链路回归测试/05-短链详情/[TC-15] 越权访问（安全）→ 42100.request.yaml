@@ -1,0 +1,15 @@
+$kind: http-request
+url: "{{baseUrl}}/api/link/detail/75971381506050"
+method: GET
+headers:
+  Authorization: Bearer {{token}}
+scripts:
+  - type: afterResponse
+    code: |-
+      // 此用例需手动填充另一个用户的 linkId
+      // 预期：不能区分"不存在"和"不属于我"，统一返回 42100
+      pm.test('越权应返回 42100（不暴露存在性）', function () {
+          pm.expect(pm.response.json().code).to.eql(42100);
+      });
+    language: text/javascript
+order: 3000

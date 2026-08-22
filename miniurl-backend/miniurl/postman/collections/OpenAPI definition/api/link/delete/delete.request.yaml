@@ -1,0 +1,15 @@
+$kind: http-request
+url: "{{baseUrl}}/api/link/delete"
+method: DELETE
+headers:
+  Content-Type: application/json
+  Accept: "*/*"
+body:
+  type: json
+  content: |-
+    {
+      "id": 7389
+    }
+settings: {}
+examples: ./.resources/delete.resources/examples
+order: 1000

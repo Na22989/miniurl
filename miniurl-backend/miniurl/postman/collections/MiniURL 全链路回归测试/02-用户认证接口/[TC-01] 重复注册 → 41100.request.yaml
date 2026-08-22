@@ -1,0 +1,20 @@
+$kind: http-request
+url: "{{baseUrl}}/api/user/register"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "username": "{{testUsername}}",
+      "password": "123456"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('重复注册应返回 41100 用户名已存在', function () {
+          pm.expect(pm.response.json().code).to.eql(41100);
+      });
+    language: text/javascript
+order: 1000

@@ -1,0 +1,17 @@
+$kind: http-request
+url: "{{baseUrl}}/api/link/list"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{token}}
+body:
+  type: text
+  content: '{"size": 100}'
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('size=100 应返回 40000', function () {
+          pm.expect(pm.response.json().code).to.eql(40000);
+      });
+    language: text/javascript
+order: 3000

@@ -1,0 +1,21 @@
+$kind: http-request
+url: "{{baseUrl}}/api/link/list"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{token}}
+body:
+  type: text
+  content: "{}"
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('分页列表正常返回', function () {
+          var json = pm.response.json();
+          pm.expect(json.code).to.eql(20000);
+          pm.expect(json.data.records).to.be.an('array');
+          pm.expect(json.data.total).to.be.at.least(1);
+          pm.expect(json.data.current).to.eql(1);
+      });
+    language: text/javascript
+order: 1000

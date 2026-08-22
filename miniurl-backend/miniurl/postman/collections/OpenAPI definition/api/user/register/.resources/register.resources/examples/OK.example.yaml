@@ -1,0 +1,34 @@
+$kind: http-example
+request:
+  url: "{{baseUrl}}/api/user/register"
+  method: POST
+  headers:
+    Content-Type: application/json
+    Accept: "*/*"
+  body:
+    type: json
+    content: |-
+      {
+        "username": "string",
+        "password": "string",
+        "nickname": "string"
+      }
+response:
+  statusCode: 200
+  statusText: OK
+  headers:
+    Content-Type: "*/*"
+  body:
+    type: text
+    content: |-
+      {
+        "code": 9720,
+        "message": "string",
+        "data": {
+          "id": 2906,
+          "username": "string",
+          "nickname": "string",
+          "createTime": "1984-07-04T16:16:22.220Z"
+        }
+      }
+order: 1000

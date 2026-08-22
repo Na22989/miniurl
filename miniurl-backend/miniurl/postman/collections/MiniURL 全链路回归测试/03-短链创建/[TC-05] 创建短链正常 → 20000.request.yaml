@@ -1,0 +1,25 @@
+$kind: http-request
+url: "{{baseUrl}}/api/link/create"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{token}}
+body:
+  type: text
+  content: |-
+    {
+      "longUrl": "https://www.baidu.com"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('创建短链成功', function () {
+          var json = pm.response.json();
+          pm.expect(json.code).to.eql(20000);
+          pm.expect(json.data.shortCode).to.be.a('string');
+          // 存储 shortCode 和 linkId 供后续用例使用
+          pm.collectionVariables.set('shortCode', json.data.shortCode);
+          pm.collectionVariables.set('linkId', json.data.id);
+      });
+    language: text/javascript
+order: 1000

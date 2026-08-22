@@ -1,0 +1,3 @@
+$kind: collection
+description: 短链跳转，公开接口无需鉴权
+order: 7000

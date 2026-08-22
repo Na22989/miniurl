@@ -1,0 +1,3 @@
+$kind: collection
+description: 测试 GlobalExceptionHandler 新增的异常类型
+order: 8000

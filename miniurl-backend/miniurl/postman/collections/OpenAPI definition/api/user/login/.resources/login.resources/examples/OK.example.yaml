@@ -1,0 +1,37 @@
+$kind: http-example
+request:
+  url: "{{baseUrl}}/api/user/login"
+  method: POST
+  headers:
+    Content-Type: application/json
+    Accept: "*/*"
+  body:
+    type: json
+    content: |-
+      {
+        "username": "string",
+        "password": "string"
+      }
+response:
+  statusCode: 200
+  statusText: OK
+  headers:
+    Content-Type: "*/*"
+  body:
+    type: text
+    content: |-
+      {
+        "code": 2946,
+        "message": "string",
+        "data": {
+          "accessToken": "string",
+          "refreshToken": "string",
+          "userInfo": {
+            "id": 2844,
+            "username": "string",
+            "nickname": "string",
+            "createTime": "2000-01-23T04:47:45.928Z"
+          }
+        }
+      }
+order: 1000
