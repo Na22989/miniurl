@@ -23,6 +23,15 @@ public class RedirectController {
 
     private final LinkService linkService;
 
+    /**
+     * 短链重定向：短码先经正则校验，跳转前兜底校验协议防 XSS
+     *
+     * @param shortCode 短码（1-11 位字母数字）
+     * @param response  响应（用于 302 跳转）
+     * @param request   请求（用于提取客户端 IP / UA）
+     * @throws IOException   响应写入失败
+     * @throws BizException 短码不存在：LINK_NOT_FOUND
+     */
     @GetMapping("/s/{shortCode}")
     public void redirect(@PathVariable @Pattern(regexp = "^[0-9a-zA-Z]{1,11}$",
             message = "非法的短链") String shortCode, HttpServletResponse response, HttpServletRequest request) throws IOException {

@@ -17,7 +17,6 @@ import java.util.function.Function;
 @Component
 public class JwtUtil {
 
-    // 从配置文件读取秘钥和过期时间
     @Value("${jwt.secret}")
     private String secret;
 
@@ -46,12 +45,6 @@ public class JwtUtil {
         return generateToken(userId, claims, refreshExpiration);
     }
 
-    /**
-     * 生成Token
-     * @param userId 用户ID（或其他唯一标识）
-     * @param extraClaims 额外信息（如角色）
-     * @return JWT字符串
-     */
     private String generateToken(Long userId, Map<String, Object> extraClaims, Long expirationMs) {
         Map<String, Object> claims = new HashMap<>(extraClaims);
         claims.put("userId", userId);
@@ -64,9 +57,6 @@ public class JwtUtil {
                 .compact();
     }
 
-    /**
-     * 从Token中提取用户ID
-     */
     public Long extractUserId(String token) {
         return Long.parseLong(extractClaim(token, Claims::getSubject));
     }
@@ -79,9 +69,6 @@ public class JwtUtil {
         return extractClaim(token, claims -> claims.get("type", String.class));
     }
 
-    /**
-     * 从Token中提取指定字段
-     */
     public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
         final Claims claims = extractAllClaims(token);
         return claimsResolver.apply(claims);
@@ -105,9 +92,6 @@ public class JwtUtil {
     }
 
 
-    /**
-     * 解析Token并获取所有Claims（私有方法）
-     */
     private Claims extractAllClaims(String token) {
         return Jwts.parser()
                 .verifyWith(getSignKey())
@@ -117,10 +101,6 @@ public class JwtUtil {
     }
 
 
-    /**
-     * 获取签名秘钥
-     * @return SecretKey
-     */
     private SecretKey getSignKey() {
         // 注意：秘钥长度至少256位（32字符）
         return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));

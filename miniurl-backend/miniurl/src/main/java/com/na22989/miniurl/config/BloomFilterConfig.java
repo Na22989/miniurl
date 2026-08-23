@@ -8,23 +8,23 @@ import org.springframework.context.annotation.Configuration;
 
 import java.nio.charset.StandardCharsets;
 
+/**
+ * 短码存在性预检布隆过滤器。
+ * <p>重定向入口先 mightContain 判定：false 一定不存在，直接返回 LINK_NOT_FOUND；
+ * true 仅代表可能存在（有误判），仍需走 L1/L2/DB 查询。</p>
+ */
 @Configuration
 public class BloomFilterConfig {
 
-    /**
-     * 预期插入的数据量（后期通过配置文件注入）
-     * 这里直接设为 10 万
-     */
     private static final int EXPECTED_INSERTIONS = 100000;
 
     /**
-     * 期望的误判率（1%），数值越小，占用的内存空间越大
+     * 误判率：值越小，占用的内存空间越大
      */
     private static final double FPP = 0.01;
 
     @Bean
     public BloomFilter<String> bloomFilter() {
-        // 使用 Funnels.stringFunnel(StandardCharsets.UTF_8) 确保字符串序列化方式
         return BloomFilter.create(
                 Funnels.stringFunnel(StandardCharsets.UTF_8),
                 EXPECTED_INSERTIONS,

@@ -79,12 +79,10 @@ public class UserRateLimitInterceptor implements HandlerInterceptor {
         }
 
         try {
-            // 从 classpath 加载 Lua 脚本
             ClassPathResource resource = new ClassPathResource("lua/rate_limit_user.lua");
             byte[] scriptBytes = FileCopyUtils.copyToByteArray(resource.getInputStream());
             String scriptContent = new String(scriptBytes, StandardCharsets.UTF_8);
 
-            // 创建 RedisScript 对象
             rateLimitScript = new DefaultRedisScript<>();
             rateLimitScript.setScriptText(scriptContent);
             // List.class 是原始类型 Class<List>，强转适配泛型擦除
@@ -101,20 +99,16 @@ public class UserRateLimitInterceptor implements HandlerInterceptor {
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
             throws IOException {
-        // 1. 检查是否启用限流
         if (!enabled) {
             return true;
         }
 
-        // 2. 获取用户 ID 和 操作类型
         Long userId = (Long) request.getAttribute("userId");
         String action = extractAction(request);
 
-        // 3. 执行限流检查
         long[] resetTimeHolder = new long[1];
         boolean allowed = checkRateLimit(userId, action, resetTimeHolder);
 
-        // 4. 放行或拒绝
         if (allowed) {
             return true;
         } else {
@@ -136,10 +130,8 @@ public class UserRateLimitInterceptor implements HandlerInterceptor {
                 return true;
             }
 
-            // Redis key
             String key = RATE_USER_KEY_PREFIX + userId + ":" + action;
 
-            // 当前毫秒时间戳
             long nowMs = System.currentTimeMillis();
 
             // 执行 Lua 脚本
@@ -157,7 +149,6 @@ public class UserRateLimitInterceptor implements HandlerInterceptor {
                     String.valueOf(System.nanoTime())
             );
 
-            // 解析结果
             if (result == null || result.size() < 3) {
                 log.error("[滑动窗口] Lua 脚本返回结果异常: {}", result);
                 return true;  // 降级：放行
@@ -175,7 +166,6 @@ public class UserRateLimitInterceptor implements HandlerInterceptor {
                 }
                 return true;
             } else {
-                // 拒绝
                 log.warn("[滑动窗口] userId={} 被限流 | 剩余次数={}", userId, remaining);
                 resetTimeHolder[0] = resetTimeMs;
                 return false;
@@ -183,7 +173,7 @@ public class UserRateLimitInterceptor implements HandlerInterceptor {
 
         } catch (Exception e) {
             log.error("[滑动窗口] 执行限流检查异常，降级放行", e);
-            return true;  // 降级：放行（避免晃动组件故障影响业务）
+            return true;  // 降级：放行（避免限流组件故障影响业务）
         }
     }
 
@@ -193,7 +183,6 @@ public class UserRateLimitInterceptor implements HandlerInterceptor {
             return "unknown";
         }
 
-        // 去掉首尾斜杠后分割
         String path = uri.startsWith("/") ? uri.substring(1) : uri;
         if (path.endsWith("/")) {
             path = path.substring(0, path.length() - 1);
@@ -203,19 +192,11 @@ public class UserRateLimitInterceptor implements HandlerInterceptor {
         return segments.length > 0 ? segments[segments.length - 1] : "unknown";
     }
 
-    /**
-     * 处理滑动窗口拒绝
-     *
-     * @param userId      用户 ID
-     * @param resetTimeMs 窗口重置毫秒时间戳（来自 Lua 脚本）
-     * @param response    HTTP 响应对象
-     */
     private void handleUserRateLimitExceeded(Long userId, long resetTimeMs, HttpServletResponse response)
             throws IOException {
         // 根据最早请求过期时间计算精确等待秒数
         long retryAfterSeconds = Math.max(1, (resetTimeMs - System.currentTimeMillis()) / 1000);
 
-        // 设置响应头
         response.setStatus(429);  // Too Many Requests
         response.setHeader("Retry-After", String.valueOf(retryAfterSeconds));
         response.setContentType("application/json;charset=UTF-8");

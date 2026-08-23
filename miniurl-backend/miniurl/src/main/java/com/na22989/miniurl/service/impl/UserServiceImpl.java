@@ -54,14 +54,12 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
          String password = request.getPassword();
          String nickname = request.getNickname();
 
-        // 1. 判断用户名是否已存在
         long count = this.count(new LambdaQueryWrapper<User>()
                 .eq(User::getUsername, username));
         if (count > 0) {
             throw new BizException(ResultCodeEnum.USERNAME_EXISTS);
         }
 
-        // 2. 创建用户
         User newUser = new User()
                 .setUsername(username)
                 .setPassword(passwordEncoder.encode(password))
@@ -74,7 +72,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
 
         this.save(newUser);
 
-        // 3. 返回用户信息（不包含密码）
+        // 返回用户信息（不包含密码）
         return UserVO.builder()
                 .id(newUser.getId())
                 .username(newUser.getUsername())
@@ -89,7 +87,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
          String username = request.getUsername();
          String password = request.getPassword();
 
-         // 1. 查询用户
         User user = this.getOne(new LambdaQueryWrapper<User>()
                 .eq(User::getUsername, username)
         );
@@ -97,16 +94,13 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
             throw new BizException(ResultCodeEnum.USER_NOT_FOUND);
         }
 
-        // 2. 校验密码
         if (!passwordEncoder.matches(password, user.getPassword())) {
             throw new BizException(ResultCodeEnum.PASSWORD_ERROR);
         }
 
-        // 3. 生成refreshToken 和 accessToken
         String refreshToken = jwtUtil.generateRefreshToken(user.getId());
         String accessToken = jwtUtil.generateAccessToken(user.getId());
 
-        // 4. 返回
         UserVO userVO = UserVO.builder().
                 id(user.getId())
                 .nickname(user.getNickname())
@@ -147,15 +141,13 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     public RefreshTokenVO refreshToken(RefreshTokenRequest request) {
         String refreshToken = request.getRefreshToken();
 
-        // 1. 判断refreshToken是否有效
         if (!jwtUtil.validateToken(refreshToken, "refresh")) {
             throw new BizException(ResultCodeEnum.REFRESH_TOKEN_INVALID);
         }
 
-        // 2. 从 refresh token 解出 userId（不信任外部传入，防止越权换 token）
+        // 从 refresh token 解出 userId（不信任外部传入，防止越权换 token）
         Long userId = jwtUtil.extractUserId(refreshToken);
 
-        // 3. 判断refreshToken是否在黑名单中
         String blackListTimeStr = stringRedisTemplate.opsForValue().get(BLACKLIST_KEY_PREFIX + userId);
         if (blackListTimeStr != null) {
             long blackListTime = Long.parseLong(blackListTimeStr);
@@ -164,7 +156,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
             }
         }
 
-        // 4. 生成新的 accessToken
         String newAccessToken = jwtUtil.generateAccessToken(userId);
 
         return RefreshTokenVO.builder()

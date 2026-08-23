@@ -46,7 +46,6 @@ public class SyncClickCounts2DBTask {
                 .count(SCAN_COUNT)
                 .build();
 
-        // try-with-resources 语法糖，自动关闭 cursor
         try (Cursor<String> cursor = stringRedisTemplate.scan(options)) {
             while (cursor.hasNext()) {
                 String key = cursor.next();
@@ -85,7 +84,6 @@ public class SyncClickCounts2DBTask {
 
         // 这里不向上抛错，留到log中解决，避免因为一批次的错误导致整个定时任务宕机
         try {
-            // 批量更新点击数到db
             int synced = linkService.batchUpdateClickCount(clickSyncDTOS);
             log.debug("批量更新成功，影响 {} 行，共 {} 条记录", synced, clickSyncDTOS.size());
             return synced;

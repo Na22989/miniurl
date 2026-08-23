@@ -46,13 +46,10 @@ public class ShortLinkUtil {
     // 2026/01/01 00:00:00 毫秒时间戳
     private static final long CUSTOM_EPOCH = 1767196800000L;
 
-    // 时间戳占用位数
     private static final long TIMESTAMP_BITS = 41L;
 
-    // 机器 ID 占用位数（预留）
     private static final long WORKER_ID_BITS = 10L;
 
-    // 序列号占用位数
     private static final long SEQUENCE_BITS = 12L;
 
     // 序列号掩码（4095，即 2^12 - 1）
@@ -86,19 +83,17 @@ public class ShortLinkUtil {
      * @throws BizException 当发生时钟回拨时抛出
      */
     public synchronized long nextId() {
-        // 1. 获取当前时间戳偏移量
         long currentTimestamp = getTimestampOffset();
 
-        // 2. 检测时钟回拨
+        // 1. 检测时钟回拨
         if (currentTimestamp < lastTimestamp) {
             long offset = lastTimestamp - currentTimestamp;
             throw new BizException(ResultCodeEnum.INTERNAL_ERROR,
                     String.format("时钟回拨 %d 毫秒，拒绝生成 ID", offset));
         }
 
-        // 3. 处理同一毫秒内的并发请求
+        // 2. 处理同一毫秒内的并发请求
         if (currentTimestamp == lastTimestamp) {
-            // 序列号递增
             sequence = (sequence + 1) & SEQUENCE_MASK;
 
             // 序列号用完（达到 4096），等待下一毫秒
@@ -106,43 +101,29 @@ public class ShortLinkUtil {
                 currentTimestamp = waitNextMillis(lastTimestamp);
             }
         } else {
-            // 新的毫秒，重置序列号为 0
             sequence = 0L;
         }
 
-        // 4. 检查时间戳是否溢出（理论上 69 年后才会发生）
+        // 3. 检查时间戳是否溢出（理论上 69 年后才会发生）
         if (currentTimestamp > MAX_TIMESTAMP_OFFSET) {
             throw new BizException(ResultCodeEnum.INTERNAL_ERROR,
                     "时间戳超出最大值，系统无法继续生成 ID");
         }
 
-        // 5. 更新上次时间戳
         lastTimestamp = currentTimestamp;
 
-        // 6. 组装 ID：时间戳（左移 22 位）| 机器 ID（左移 12 位，当前为 0）| 序列号
+        // 4. 组装 ID：时间戳（左移 22 位）| 机器 ID（左移 12 位，当前为 0）| 序列号
         return (currentTimestamp << TIMESTAMP_LEFT_SHIFT) | sequence;
     }
 
-    /**
-     * 获取时间戳偏移量
-     *
-     */
     private long getTimestampOffset() {
         return System.currentTimeMillis() - CUSTOM_EPOCH;
     }
 
-    /**
-     * 等待下一毫秒到来（阻塞等待）
-     *
-     * @param lastTimestamp 上次时间戳
-     * @return 新的时间戳
-     */
     private long waitNextMillis(long lastTimestamp) {
         long timestamp = getTimestampOffset();
 
-        // 循环等待，直到时间戳前进
         while (timestamp <= lastTimestamp) {
-            // 自旋等待
             Thread.onSpinWait();
             timestamp = getTimestampOffset();
         }
@@ -163,21 +144,17 @@ public class ShortLinkUtil {
      * Base62 字符集：0-9, a-z, A-Z（62 个字符）
      * - 比 Base64 少 2 个特殊字符（+/），更适合 URL
      * - 编码长度：约 log62(2^64) ≈ 11 字符（最大值）
-     * <p>
-     * 实际长度取决于 ID 的大小：
      *
      * @param num 待编码的数字
      * @return Base62 编码字符串（短码）
      */
     public String base62Encode(long num) {
-        // 特殊处理：0 直接返回 "0"
         if (num == 0) {
             return "0";
         }
 
         StringBuilder sb = new StringBuilder();
 
-        // 除基取余法
         while (num > 0) {
             sb.append(BASE62.charAt((int) (num % 62)));
             num /= 62;

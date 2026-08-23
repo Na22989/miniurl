@@ -55,7 +55,7 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         this.objectMapper = objectMapper;
     }
 
-    // 配置项（从 application.yml 读取）
+    // 配置项
 
     @Value("${rate-limit.enabled:true}")
     private boolean enabled;
@@ -87,12 +87,10 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         }
 
         try {
-            // 从 classpath 加载 Lua 脚本
             ClassPathResource resource = new ClassPathResource("lua/rate_limit.lua");
             byte[] scriptBytes = FileCopyUtils.copyToByteArray(resource.getInputStream());
             String scriptContent = new String(scriptBytes, StandardCharsets.UTF_8);
 
-            // 创建 RedisScript 对象
             rateLimitScript = new DefaultRedisScript<>();
             rateLimitScript.setScriptText(scriptContent);
             // List.class 是原始类型 Class<List>，强转适配泛型擦除
@@ -110,18 +108,14 @@ public class RateLimitInterceptor implements HandlerInterceptor {
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
             throws IOException {
-        // 1. 检查是否启用限流
         if (!enabled) {
             return true;
         }
 
-        // 2. 获取客户端真实 IP
         String clientIp = NetUtil.getIpAddress(request, proxiesToTrust);
 
-        // 3. 执行限流检查
         boolean allowed = checkRateLimit(clientIp);
 
-        // 4. 放行或拒绝
         if (allowed) {
             return true;
         } else {
@@ -130,18 +124,10 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         }
     }
 
-    /**
-     * 执行限流检查（调用 Redis Lua 脚本）
-     *
-     * @param clientIp 客户端 IP
-     * @return true = 放行，false = 拒绝
-     */
     private boolean checkRateLimit(String clientIp) {
         try {
-            // Redis key
             String key = RATE_IP_KEY_PREFIX + clientIp;
 
-            // 当前毫秒时间戳
             long now = System.currentTimeMillis();
 
             // 执行 Lua 脚本
@@ -159,7 +145,6 @@ public class RateLimitInterceptor implements HandlerInterceptor {
                     "1"  // 每次请求消耗 1 个令牌
             );
 
-            // 解析结果
             if (result == null || result.size() < 2) {
                 log.error("[限流] Lua 脚本返回结果异常: {}", result);
                 return true;  // 降级：放行
@@ -175,7 +160,6 @@ public class RateLimitInterceptor implements HandlerInterceptor {
                 }
                 return true;
             } else {
-                // 拒绝
                 log.warn("[限流] IP={} 被限流 | 剩余令牌={}", clientIp, remaining);
                 return false;
             }
@@ -186,18 +170,11 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         }
     }
 
-    /**
-     * 处理限流拒绝
-     *
-     * @param clientIp 客户端 IP
-     * @param response HTTP 响应对象
-     */
     private void handleRateLimitExceeded(String clientIp, HttpServletResponse response)
             throws IOException {
-        // 计算建议等待时间（秒）
+        // 一个令牌的生成间隔（秒），作为建议等待时间
         int retryAfterSeconds = (int) Math.ceil(1.0 / tokensPerSecond);
 
-        // 设置响应头
         response.setStatus(429);  // Too Many Requests
         response.setHeader("Retry-After", String.valueOf(retryAfterSeconds));
         response.setContentType("application/json;charset=UTF-8");

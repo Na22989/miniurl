@@ -87,9 +87,6 @@ public class LinkServiceImpl  extends ServiceImpl<LinkMapper, Link>
     private final AtomicLong bloomRejectCount = new AtomicLong(0); // Bloom 拒绝
     private final AtomicLong notFoundCount   = new AtomicLong(0);  // 真正不存在
 
-    /**
-     * 启动时加载所有短码到布隆过滤器
-     */
     @PostConstruct
     public void initBloomFilter() {
         log.info("开始加载 shortCode 到布隆过滤器...");
@@ -117,7 +114,6 @@ public class LinkServiceImpl  extends ServiceImpl<LinkMapper, Link>
                     bloomFilter.put(link.getShortCode());
                 }
 
-                // 更新游标 lastId
                 totalLoaded+= records.size();
                 lastId = records.get(records.size() - 1).getId();
 
@@ -145,10 +141,8 @@ public class LinkServiceImpl  extends ServiceImpl<LinkMapper, Link>
 
         long id = shortLinkUtil.nextId();
 
-        // 生成短链接
         String shortCode = shortLinkUtil.base62Encode(id);
 
-        // 保存到数据库
         Link link = new Link()
                 .setId(id)
                 .setShortCode(shortCode)
@@ -171,12 +165,10 @@ public class LinkServiceImpl  extends ServiceImpl<LinkMapper, Link>
             }
         }
 
-        // 缓存到本地
         shortCodeLocalCache.put(shortCode, cacheValue);
 
         recorder.recordLinkCreated();
 
-        // 更新布隆过滤器
         bloomFilter.put(shortCode);
 
         return LinkVO.builder()
@@ -194,7 +186,6 @@ public class LinkServiceImpl  extends ServiceImpl<LinkMapper, Link>
     public String redirect(String shortCode, HttpServletRequest request) {
         totalRequests.incrementAndGet();
 
-        // 1. 检查布隆过滤器
         if (!bloomFilter.mightContain(shortCode)) {
             bloomRejectCount.incrementAndGet();
             recorder.recordRedirectFail("bloom_reject");
@@ -203,12 +194,11 @@ public class LinkServiceImpl  extends ServiceImpl<LinkMapper, Link>
 
         AccessMeta accessMeta = NetUtil.getAccessMeta(request, proxiesToTrust);
 
-        // 2. 检查本地缓存（方案 B：缓存值携带 linkId）
+        // 检查本地缓存（方案 B：缓存值携带 linkId）
         LinkCacheValue localValue = shortCodeLocalCache.getIfPresent(shortCode);
         if (localValue != null) {
             // 命中缓存：点击数也不能丢，事件发布
             eventPublisher.publishEvent(new LinkAccessedEvent(shortCode, localValue.getLinkId(), accessMeta));
-            // 本地缓存
             l1HitCount.incrementAndGet();
             recorder.recordRedirect("l1");
             return localValue.getLongUrl();
@@ -217,7 +207,7 @@ public class LinkServiceImpl  extends ServiceImpl<LinkMapper, Link>
 
         String cacheKey = SHORT_CODE_PREFIX + shortCode;
 
-        // 1. 查 Redis 缓存（Cache-Aside 读，值 = LinkCacheValue 的 JSON）
+        // 查 Redis 缓存（Cache-Aside 读，值 = LinkCacheValue 的 JSON）
         String cachedJson = stringRedisTemplate.opsForValue().get(cacheKey);
         LinkCacheValue redisValue = null;
         if (cachedJson != null) {
@@ -232,26 +222,23 @@ public class LinkServiceImpl  extends ServiceImpl<LinkMapper, Link>
             shortCodeLocalCache.put(shortCode, redisValue);
             // 命中缓存：点击数也不能丢，事件发布
             eventPublisher.publishEvent(new LinkAccessedEvent(shortCode, redisValue.getLinkId(), accessMeta));
-            // redis 缓存
             recorder.recordRedirect("l2");
             l2HitCount.incrementAndGet();
             return redisValue.getLongUrl();
         }
 
-        // 2. 缓存未命中，查 DB（select 带上 id：方案 B 需要 linkId 写缓存 + 发布事件）
+        // 缓存未命中，查 DB（select 带上 id：方案 B 需要 linkId 写缓存 + 发布事件）
         Link link = this.getOne(new LambdaQueryWrapper<Link>()
                 .select(Link::getId, Link::getLongUrl, Link::getExpireTime)
                 .eq(Link::getShortCode, shortCode));
 
 
-        // 3. 判断是否存在
         if (link == null) {
             notFoundCount.incrementAndGet();
             recorder.recordRedirectFail("not_found");
             throw new BizException(ResultCodeEnum.LINK_NOT_FOUND);
         }
 
-        // 4. 判断是否过期
         if (link.getExpireTime() != null && !link.getExpireTime().isAfter(LocalDateTime.now())) {
             recorder.recordRedirectFail("expired");
             throw new BizException(ResultCodeEnum.LINK_EXPIRED);
@@ -259,7 +246,7 @@ public class LinkServiceImpl  extends ServiceImpl<LinkMapper, Link>
 
         recorder.recordRedirect("db");
         dbHitCount.incrementAndGet();
-        // 5. 写 Redis 缓存（TTL 上限 1 小时，取 expireTime 剩余时间的较小值）
+        // 写 Redis 缓存（TTL 上限 1 小时，取 expireTime 剩余时间的较小值）
         Duration ttl = calcCacheTtl(link);
         LinkCacheValue dbValue = new LinkCacheValue(link.getId(), link.getLongUrl());
         if (ttl.getSeconds() > 0) {
@@ -279,19 +266,14 @@ public class LinkServiceImpl  extends ServiceImpl<LinkMapper, Link>
 
     @Override
     public PageResult<LinkVO> listUserLinks(Long userId, PageLinkRequest request) {
-        // 1. 参数校验
-
-        // 2. 构建分页对象
         Page<Link> page = new Page<>(request.getCurrent(), request.getSize());
 
-        // 3. 构建查询条件
         LambdaQueryWrapper<Link> queryWrapper = new LambdaQueryWrapper<Link>()
                 .eq(Link::getUserId, userId)
                 .orderByDesc(Link::getCreateTime);
 
         IPage<Link> linkIPage = this.page(page, queryWrapper);
 
-        // 4. entity 转 vo
         List<LinkVO> linkVOList = linkIPage.getRecords().stream().map(this::toLinkVO).toList();
 
         return new PageResult<>(linkVOList, linkIPage.getTotal(), linkIPage.getCurrent(), linkIPage.getSize(), linkIPage.getPages());
@@ -299,24 +281,19 @@ public class LinkServiceImpl  extends ServiceImpl<LinkMapper, Link>
 
     @Override
     public void deleteLink(Long userId, DeleteRequest request) {
-        // 1. 参数校验
         Long linkId = request.getId();
 
-        // 2. 查询是否存在
         Link link = this.getById(linkId);
         if (link == null) {
             throw new BizException(ResultCodeEnum.LINK_NOT_FOUND);
         }
 
-        // 3. 仅本人可以操作链接
         if (!link.getUserId().equals(userId)) {
             throw new BizException(ResultCodeEnum.LINK_NOT_FOUND);
         }
 
-        // 4. 删除链接
         this.removeById(linkId);
 
-        // 删除缓存
         stringRedisTemplate.delete(SHORT_CODE_PREFIX + link.getShortCode());
         stringRedisTemplate.delete(CLICK_COUNT_PREFIX + link.getShortCode());
         shortCodeLocalCache.invalidate(link.getShortCode());
@@ -324,18 +301,16 @@ public class LinkServiceImpl  extends ServiceImpl<LinkMapper, Link>
 
     @Override
     public LinkVO getLinkDetail(Long userId, Long linkId) {
-        // 1. 参数校验
         if (linkId <= 0) {
             throw new BizException(ResultCodeEnum.BAD_REQUEST, "链接ID必须大于0");
         }
 
-        // 2. 查询是否存在
         Link link = this.getById(linkId);
         if (link == null) {
             throw new BizException(ResultCodeEnum.LINK_NOT_FOUND);
         }
 
-        // 3， 仅本人可以操作链接，相同错误码可以避免攻击者区分出有效链接
+        // 3. 仅本人可以操作链接，相同错误码可以避免攻击者区分出有效链接
         if (!link.getUserId().equals(userId)) {
             throw new BizException(ResultCodeEnum.LINK_NOT_FOUND);
         }

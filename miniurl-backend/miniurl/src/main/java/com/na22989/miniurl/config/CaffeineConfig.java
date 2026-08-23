@@ -14,9 +14,9 @@ import java.util.concurrent.TimeUnit;
       @Bean
       public Cache<String, LinkCacheValue> shortCodeLocalCache() {
           return Caffeine.newBuilder()
-                  .maximumSize(10000)        // 最多缓存 1 万条
-                  .expireAfterWrite(5, TimeUnit.MINUTES)  // 写入后 5 分钟过期
-                  .recordStats()              // 开启命中率统计
+                  .maximumSize(10000)
+                  .expireAfterWrite(5, TimeUnit.MINUTES)
+                  .recordStats()
                   .build();
       }
   }

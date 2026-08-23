@@ -8,35 +8,27 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadPoolExecutor;
 
 
+/**
+ * 异步线程池：承载访问事件消费（点击计数 Redis INCR + 访问日志落库）。
+ * <p>核心 4 / 最大 8 / 有界队列 1000：任务均为单条轻量操作，池只需把重定向线程
+ * 快速卸下的请求短暂缓冲，无需大池；有界队列吸收瞬时突发，避免无限堆积内存。
+ * 不用 MQ：计数场景对可靠性要求不高，线程池足够，省去运维复杂度。</p>
+ * <p>队列打满时 CallerRunsPolicy 回压到调用线程而非丢弃——计数/日志可迟到不可丢；
+ * 代价是极端流量下重定向 RT 上升，属有意取舍。</p>
+ */
 @Configuration
 public class AsyncConfig {
 
     @Bean
     public Executor clickCountExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-
-        // 核心线程数：正常情况下的线程数量
         executor.setCorePoolSize(4);
-
-        // 最大线程数：当核心线程数不够用时，会创建新的线程，但总线程数不能超过最大线程数
         executor.setMaxPoolSize(8);
-
-        // 队列容量：当线程数达到最大线程数时，新任务会被放入队列中等待执行
         executor.setQueueCapacity(1000);
-
-        // 线程名前缀：方便日志排查
         executor.setThreadNamePrefix("click-count-");
-
-        // 线程空闲时间：当线程空闲时间超过这个时间时，线程会被销毁
         executor.setKeepAliveSeconds(60);
-
-        // 拒绝策略：队列满了怎么办？
-        // CallerRunsPolicy = 由调用者线程（主线程）执行，不丢失任务
         executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
-
-        // 初始化
         executor.initialize();
-
         return executor;
     }
 }

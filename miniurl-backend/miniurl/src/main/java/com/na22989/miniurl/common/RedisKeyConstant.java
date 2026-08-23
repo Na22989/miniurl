@@ -1,7 +1,7 @@
 package com.na22989.miniurl.common;
 
 /**
- * Redis Key 统一常量，避免业务类之间出现反向依赖
+ * Redis Key 统一常量，避免业务类之间出现反向依赖。
  * <p>
  * 所有 Redis key 前缀集中在此管理。
  */

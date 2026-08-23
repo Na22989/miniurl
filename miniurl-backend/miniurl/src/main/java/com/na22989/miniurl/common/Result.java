@@ -7,7 +7,7 @@ import java.io.Serializable;
 /**
  * 通用返回类
  *
- * @param <T>
+ * @param <T> 响应数据 data 的类型
  * @author wangtianjian
  */
 @Data
@@ -33,18 +33,10 @@ public class Result<T> implements Serializable {
         return new Result<>(ResultCodeEnum.SUCCESS.getCode(), "success", data);
     }
 
-    /**
-     * 失败
-     *
-     */
     public static Result<?> fail(ResultCodeEnum resultCodeEnum) {
         return new Result<>(resultCodeEnum);
     }
 
-    /**
-     * 失败
-     *
-     */
     public static Result<?> fail(ResultCodeEnum resultCodeEnum, String message) {
         return new Result<>(resultCodeEnum.getCode(), message, null);
     }

@@ -12,7 +12,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * 网络工具类
+ * 网络工具类。
  *
  * <p>=== 安全模型 ===
  * <pre>
@@ -21,7 +21,7 @@ import java.util.Set;
  * 3. 直连 IP 在可信代理白名单 → 才采信 X-Real-IP / X-Forwarded-For 等代理头
  * </pre>
  *
- * <p>修复的漏洞（详见 SECURITY_AUDIT_NetUtil.md）：
+ * <p>修复的漏洞（编号沿用 SECURITY_AUDIT_NetUtil.md，该文档暂未入库）：
  * <ul>
  *   <li>P0#1：X-Real-IP 无条件信任 → 伪造头绕过限流。现在只有可信代理设的头才被采信</li>
  *   <li>P0#2：proxiesToTrust 默认 0 硬编码 → 移除默认值，调用方必须显式传参</li>

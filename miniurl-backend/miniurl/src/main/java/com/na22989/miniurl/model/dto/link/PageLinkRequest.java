@@ -4,8 +4,6 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.Data;
 
-import java.time.LocalDateTime;
-
 @Data
 public class PageLinkRequest {
 
@@ -15,8 +13,4 @@ public class PageLinkRequest {
     @Min(value = 1, message = "分页大小至少为 1")
     @Max(value = 40, message = "分页大小最大为 40")
     private int size = 10;
-
-//    private LocalDateTime startTime;
-//
-//    private LocalDateTime endTime;
 }

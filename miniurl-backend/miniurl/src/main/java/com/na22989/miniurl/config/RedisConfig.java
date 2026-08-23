@@ -16,19 +16,17 @@ public class RedisConfig {
 
     /**
      * 通用 RedisTemplate — Key 用 String，Value 用 JSON。
-     *
      */
     @Bean
     public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory factory) {
         RedisTemplate<String, Object> template = new RedisTemplate<>();
         template.setConnectionFactory(factory);
 
-        // Key 序列化：String
         StringRedisSerializer stringSerializer = new StringRedisSerializer();
         template.setKeySerializer(stringSerializer);
         template.setHashKeySerializer(stringSerializer);
 
-        // Value 序列化：JSON（Spring Data Redis 3.x 内置，自动处理 ObjectMapper）
+        // Value 用 JSON 序列化：Spring Data Redis 3.x 内置，自动处理 ObjectMapper
         RedisSerializer<Object> jsonSerializer = RedisSerializer.json();
         template.setValueSerializer(jsonSerializer);
         template.setHashValueSerializer(jsonSerializer);
@@ -37,9 +35,6 @@ public class RedisConfig {
         return template;
     }
 
-    /**
-     * StringRedisTemplate — Key 和 Value 都是 String。
-     */
     @Bean
     public StringRedisTemplate stringRedisTemplate(RedisConnectionFactory factory) {
         return new StringRedisTemplate(factory);
