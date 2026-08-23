@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.when;
 
 /**
- * 验证 NetUtil 修复效果（Week 4 Day 6 安全加固后回归）
+ * 验证 NetUtil 修复效果
  *
  * <p>旧版测试 mock remoteAddr="192.0.2.1"（非可信）在新安全模型下会被视为"非可信源忽略代理头"，
  * 因此本类改为：可信直连（127.0.0.1）验证多级代理提取，另用非可信源验证伪造头被忽略。</p>
