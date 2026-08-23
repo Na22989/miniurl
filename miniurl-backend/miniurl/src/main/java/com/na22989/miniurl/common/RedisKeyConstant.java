@@ -24,4 +24,7 @@ public final class RedisKeyConstant {
 
     /** 用户级限流（滑动窗口），key 格式 rate:user:{userId}:{action} */
     public static final String RATE_USER_KEY_PREFIX = "rate:user:";
+
+    /** 全局限流（令牌桶），key 格式 rate:global:{action}，全局共享不分维度 */
+    public static final String RATE_GLOBAL_KEY_PREFIX = "rate:global:";
 }

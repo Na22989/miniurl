@@ -1,5 +1,6 @@
 package com.na22989.miniurl.config;
 
+import com.na22989.miniurl.interceptor.GlobalRateLimitInterceptor;
 import com.na22989.miniurl.interceptor.LoginInterceptor;
 import com.na22989.miniurl.interceptor.RateLimitInterceptor;
 import com.na22989.miniurl.interceptor.UserRateLimitInterceptor;
@@ -21,6 +22,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
     private final LoginInterceptor loginInterceptor;
     private final RateLimitInterceptor rateLimitInterceptor;
     private final UserRateLimitInterceptor userRateLimitInterceptor;
+    private final GlobalRateLimitInterceptor globalRateLimitInterceptor;
 
     @Override
     public void addCorsMappings(CorsRegistry registry) {
@@ -56,9 +58,14 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 )
                 .order(2);  // 优先级 2
 
+        // 全局级限流拦截器（必须 Login 之后：未认证请求不消耗全局配额，防刷未登录请求打满全局桶）
+        registry.addInterceptor(globalRateLimitInterceptor)
+                .addPathPatterns("/api/link/create")
+                .order(3); // 优先级 3
+
         // 用户级滑动窗口限流拦截器（必须在 LoginInterceptor 之后，依赖 userId Attribute）
         registry.addInterceptor(userRateLimitInterceptor)
                 .addPathPatterns("/api/link/create")
-                .order(3);  // 优先级 3
+                .order(4);  // 优先级 4
     }
 }

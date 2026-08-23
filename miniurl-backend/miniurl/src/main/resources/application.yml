@@ -66,6 +66,11 @@ rate-limit:
     enabled: true               # 是否启用用户限流（默认 true）
     window-ms: 60000            # 滑动窗口长度（毫秒）
     max-requests: 50            # 滑动窗口请求上限
+  global:
+    enabled: true               # 是否启用全局限流（默认 true）
+    tokens-per-second: 100      # 令牌生成速率（个/秒），设计 §9.3 全局创建 100 req/s
+    max-tokens: 100             # 桶容量上限（突发流量支持）
+
 
 # MiniURL 服务配置
 miniurl:
