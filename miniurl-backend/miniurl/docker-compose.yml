@@ -96,9 +96,10 @@ services:
       SPRING_DATA_REDIS_PORT: "6379"
       SPRING_DATA_REDIS_PASSWORD: root
       # 短链返回给客户端的对外地址（Spring 宽松绑定 → miniurl.base-url）：
-      # nginx 是本栈对外入口（:80），故 base-url 指向 http://localhost，短链重定向走 nginx 全链路；
-      # 若直接暴露 app（无 nginx）或 VM/域名部署，改成对应地址（见 application.yml 注释）
-      MINIURL_BASE_URL: http://localhost
+      # nginx 是本栈对外入口（:80），base-url 默认 localhost 仅本机可点；局域网/手机访问
+      # 时用环境变量 MINIURL_LAN_IP 覆盖（如 VM 上 .env 写 MINIURL_LAN_IP=192.168.100.3），
+      # IP 变化只改 .env 不用动仓库；未设置回退 localhost（本地/CI 默认行为）
+      MINIURL_BASE_URL: http://${MINIURL_LAN_IP:-localhost}
       # 安全：strict-mode=true（Spring 宽松绑定 → miniurl.security.strict-mode）。
       # 非可信源（白名单外）尝试伪造 X-Real-IP/X-Forwarded-For 直接拒绝而非仅审计；
       # 本栈流量走 nginx（172.16/12 白名单内），正常请求不受影响。application.yml 默认仍 false，
