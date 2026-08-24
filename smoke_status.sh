@@ -1,12 +1,13 @@
 #!/bin/bash
 # Day 5 冒烟测试：访问统计接口 GET /api/link/status/{linkId}（PV/UV/趋势）
-# 用法: bash smoke_status.sh
-# 前置: 应用运行在 localhost:9191，MySQL + Redis 已启动
+# 用法: bash smoke_status.sh            # 默认连 localhost:9191
+#       BASE=http://localhost:19191 bash smoke_status.sh   # 覆盖基址（CI self-hosted 隔离端口）
+# 前置: 应用运行在 ${BASE:-localhost:9191}，MySQL + Redis 已启动
 #
 # 覆盖：正常统计（含 clickCount 30s 落库）/ 越权 42100 / 不存在 42100 / linkId<=0 40000 / 未登录 40100
 
 set +e
-BASE="http://localhost:9191"
+BASE="${BASE:-http://localhost:9191}"
 PASS=0; FAIL=0
 RED='\033[0;31m'; GREEN='\033[0;32m'; NC='\033[0m'
 

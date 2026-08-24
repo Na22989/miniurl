@@ -3,11 +3,15 @@
 #
 # 触发：push / PR 到 main，或手动 workflow_dispatch（Actions 页 Run workflow）
 #
-# job1 test               干净克隆上跑全量单元测试（./mvnw test）
+# job1 test               干净克隆上跑全量单元测试（./mvnw test），GitHub 托管 runner
 # job2 docker-compose-test 依赖 job1，compose 构建应用镜像 + 起 mysql/redis/app
 #                           + 健康检查 + 冒烟脚本，模拟容器化部署
+#                           → 跑在 self-hosted runner（miniurl-vm，VM 模拟生产环境）
 #
-# 零密钥、零第三方服务，纯 GitHub 托管 runner（ubuntu-latest）
+# job2 隔离说明：VM 上常驻模拟生产栈（miniurl-* 容器 + 3306/6379/9191 端口），
+#   job2 通过 docker-compose.ci.yml 覆盖 + COMPOSE_PROJECT_NAME=miniurl-ci 实现三层隔离：
+#   容器名 miniurl-ci-*、端口 13306/16379/19191、独立卷前缀 → down -v 只清 CI 自己的卷。
+# 零密钥、零第三方服务；job1 托管 runner，job2 self-hosted（VM 有真实 Docker 环境）
 # ============================================================
 
 name: CI
@@ -49,12 +53,16 @@ jobs:
         # --batch-mode 关闭交互提示；--no-transfer-progress 精简 Maven 下载日志
         run: ./mvnw --batch-mode --no-transfer-progress test
 
-  # ---------- job2：Docker 镜像部署测试 ----------
+  # ---------- job2：Docker 镜像部署测试（self-hosted 隔离） ----------
   docker-compose-test:
     name: Docker 镜像部署测试 (三件套 + 冒烟)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]      # VM 模拟生产环境（真实 Linux Docker）
     needs: test                   # 单元测试过了才构建镜像
     timeout-minutes: 30
+    # 隔离核心：项目名加前缀 → 卷/网络不和生产栈（miniurl）共享；
+    # 端口/容器名隔离在 docker-compose.ci.yml 里覆盖
+    env:
+      COMPOSE_PROJECT_NAME: miniurl-ci
     defaults:
       run:
         working-directory: miniurl-backend/miniurl
@@ -63,30 +71,35 @@ jobs:
         uses: actions/checkout@v4
 
       - name: 构建应用镜像（多阶段 Dockerfile）
-        # 只 build 应用镜像；mysql/redis 直接拉官方镜像，不重复构建
-        run: docker compose build miniurl-app
+        # 只 build 应用镜像；mysql/redis 直接拉官方镜像，不重复构建。
+        # -f ci 覆盖：镜像 tag 用 miniurl-app:ci，不动生产栈的 :latest
+        run: docker compose -f docker-compose.yml -f docker-compose.ci.yml build miniurl-app
 
       - name: 启动 MySQL + Redis + App（三件套，依赖 healthcheck）
-        run: docker compose up -d mysql redis miniurl-app
+        run: docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d mysql redis miniurl-app
 
       - name: 等待 App 健康检查通过（最多 90s）
+        # CI 端口被覆盖到 19191（隔离生产 9191）
         run: |
           for i in $(seq 1 90); do
-            if curl -sf http://localhost:9191/actuator/health | grep -q '"status":"UP"'; then
+            if curl -sf http://localhost:19191/actuator/health | grep -q '"status":"UP"'; then
               echo "✅ App 健康，第 ${i}s 就绪"
               exit 0
             fi
             sleep 1
           done
           echo "❌ App 90s 内未就绪，最近 40 行日志：" >&2
-          docker compose logs --tail 40 miniurl-app >&2
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml logs --tail 40 miniurl-app >&2
           exit 1
 
       - name: 冒烟测试（smoke_status.sh）
-        # 脚本在仓库根（不在 miniurl 子目录），覆盖根目录跑；BASE 指向 runner 宿主 9191
+        # 脚本在仓库根（不在 miniurl 子目录），覆盖根目录跑；BASE 指向 CI 隔离端口 19191
         working-directory: .
+        env:
+          BASE: http://localhost:19191
         run: bash smoke_status.sh
 
       - name: 清理容器与数据卷（无论成败都执行）
+        # COMPOSE_PROJECT_NAME=miniurl-ci → down -v 只删 CI 自己的容器/卷，生产栈不受影响
         if: always()
-        run: docker compose down -v
+        run: docker compose -f docker-compose.yml -f docker-compose.ci.yml down -v
