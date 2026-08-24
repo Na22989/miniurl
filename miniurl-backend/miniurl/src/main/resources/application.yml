@@ -1,6 +1,10 @@
 logging:
   file:
     name: logs/miniurl.log
+  pattern:
+    # Spring Boot 默认的 console/file pattern 里已经预留了 ${LOG_CORRELATION_PATTERN} 占位符，
+    # 这里只需要定义它要填什么内容，无需覆写整个 pattern。
+    correlation: "[%X{traceId:-}] "
 
 spring:
   application.name: miniurl

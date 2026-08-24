@@ -1,5 +1,6 @@
 package com.na22989.miniurl.config;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
@@ -17,7 +18,10 @@ import java.util.concurrent.ThreadPoolExecutor;
  * 代价是极端流量下重定向 RT 上升，属有意取舍。</p>
  */
 @Configuration
+@RequiredArgsConstructor
 public class AsyncConfig {
+
+    private final MdcTaskDecorator mdcTaskDecorator;
 
     @Bean
     public Executor clickCountExecutor() {
@@ -28,6 +32,8 @@ public class AsyncConfig {
         executor.setThreadNamePrefix("click-count-");
         executor.setKeepAliveSeconds(60);
         executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        // 把请求线程的 MDC 搬运到异步线程：点击计数日志与触发它的请求共享同一 traceId
+        executor.setTaskDecorator(mdcTaskDecorator);
         executor.initialize();
         return executor;
     }
