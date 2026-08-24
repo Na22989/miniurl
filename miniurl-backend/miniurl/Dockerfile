@@ -5,12 +5,14 @@ WORKDIR /build
 
 # 利用 Docker 缓存：先复制依赖定义文件
 COPY pom.xml ./
-RUN mvn -B dependency:go-offline \
+# --mount=type=cache 把 /root/.m2 挂成持久缓存卷：Maven 依赖层缓存不可靠（依赖层输出非确定），
+# 用缓存卷跨构建复用，依赖只下载一次，重建时 go-offline 秒过（省时间也省磁盘）
+RUN --mount=type=cache,target=/root/.m2 mvn -B dependency:go-offline \
     && mvn -B dependency:resolve-plugins
 
 # 复制源码并构建（此时依赖已缓存）
 COPY src ./src
-RUN mvn -B clean package -DskipTests \
+RUN --mount=type=cache,target=/root/.m2 mvn -B clean package -DskipTests \
     && cp target/app.jar /build/app.jar
 
 # 运行阶段

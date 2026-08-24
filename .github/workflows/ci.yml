@@ -104,10 +104,12 @@ jobs:
         if: always()
         run: docker compose -f docker-compose.yml -f docker-compose.ci.yml down -v
 
-      - name: 清理 CI 镜像与构建缓存（防止 self-hosted VM 磁盘被反复构建吃满）
-        # self-hosted 磁盘仅 9.8G：每次构建会残留 miniurl-app:ci 镜像 + build cache。
-        # --force 免交互；builder prune 只删未被生产栈镜像引用的缓存层
+      - name: 清理 CI 镜像与过期构建缓存（保留 cache mount 复用 Maven 依赖）
+        # Dockerfile 用 --mount=type=cache 缓存 /root/.m2（跨构建复用，避免每次重下依赖）。
+        # 不能裸 docker builder prune -f——会清掉 .m2 缓存卷，回到每次 CI 全量重编；
+        # --filter until=72h 只清 72h 未用的旧缓存，刚构建用过的 .m2 卷（last-used 最新）被保留。
+        # rmi 删 CI 镜像释放镜像层空间；build cache 层留下复用
         if: always()
         run: |
           docker rmi miniurl-app:ci 2>/dev/null || true
-          docker builder prune -f
+          docker builder prune -f --filter until=72h
