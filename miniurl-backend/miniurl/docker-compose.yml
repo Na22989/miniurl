@@ -124,8 +124,9 @@ services:
       # nginx 上游 miniurl-app:9191 在 compose 网络内自动解析，app 未就绪时短暂 502 属正常
       - miniurl-app
     healthcheck:
-      # busybox wget 探活；/actuator/health 在 nginx 配置里精确匹配免限速
-      test: ["CMD-SHELL", "wget -q --spider http://localhost/actuator/health || exit 1"]
+      # busybox wget 探活；/actuator/health 在 nginx 配置里精确匹配免限速。
+      # 探活必须用 127.0.0.1：容器内 localhost 解析到 ::1（IPv6），而挂载的 nginx.conf 只监听 IPv4
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/actuator/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
