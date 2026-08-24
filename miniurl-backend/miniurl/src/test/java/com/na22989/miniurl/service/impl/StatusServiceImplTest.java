@@ -1,4 +1,4 @@
-package com.na22989.miniurl.service;
+package com.na22989.miniurl.service.impl;
 
 import com.na22989.miniurl.common.ResultCodeEnum;
 import com.na22989.miniurl.exception.BizException;
@@ -6,7 +6,7 @@ import com.na22989.miniurl.mapper.LinkAccessLogMapper;
 import com.na22989.miniurl.model.dto.link.HourlyStatus;
 import com.na22989.miniurl.model.entity.Link;
 import com.na22989.miniurl.model.vo.link.LinkStatusVO;
-import com.na22989.miniurl.service.impl.StatusServiceImpl;
+import com.na22989.miniurl.service.LinkService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
