@@ -99,6 +99,11 @@ services:
       # nginx 是本栈对外入口（:80），故 base-url 指向 http://localhost，短链重定向走 nginx 全链路；
       # 若直接暴露 app（无 nginx）或 VM/域名部署，改成对应地址（见 application.yml 注释）
       MINIURL_BASE_URL: http://localhost
+      # 安全：strict-mode=true（Spring 宽松绑定 → miniurl.security.strict-mode）。
+      # 非可信源（白名单外）尝试伪造 X-Real-IP/X-Forwarded-For 直接拒绝而非仅审计；
+      # 本栈流量走 nginx（172.16/12 白名单内），正常请求不受影响。application.yml 默认仍 false，
+      # 本地开发/CI 走默认；容器生产栈这里显式开启
+      MINIURL_SECURITY_STRICT_MODE: "true"
 
     depends_on:
       # 等依赖 healthcheck 通过（service_healthy）再启动应用，避免应用一启动就连库失败
