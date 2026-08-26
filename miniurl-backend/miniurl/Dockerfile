@@ -5,8 +5,9 @@ WORKDIR /build
 
 # 利用 Docker 缓存：先复制依赖定义文件
 COPY pom.xml ./
-# --mount=type=cache 把 /root/.m2 挂成持久缓存卷：Maven 依赖层缓存不可靠（依赖层输出非确定），
-# 用缓存卷跨构建复用，依赖只下载一次，重建时 go-offline 秒过（省时间也省磁盘）
+# --mount=type=cache 把 /root/.m2 挂成持久缓存卷：依赖放卷里、不进镜像层（RUN 层保持极小），
+# 图层缓存失效（pom 变更）时依赖仍在卷中，只下增量；配合 CI 清理用 --filter until=72h 跨轮存活。
+# 曾踩坑：CI cleanup 用裸 prune -f 每轮清空整个 build cache（含缓存卷）→ 次轮必然全量重编。
 RUN --mount=type=cache,target=/root/.m2 mvn -B dependency:go-offline \
     && mvn -B dependency:resolve-plugins
 
