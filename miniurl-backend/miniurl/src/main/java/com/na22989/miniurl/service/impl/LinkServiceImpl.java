@@ -276,7 +276,8 @@ public class LinkServiceImpl  extends ServiceImpl<LinkMapper, Link>
 
         List<LinkVO> linkVOList = linkIPage.getRecords().stream().map(this::toLinkVO).toList();
 
-        return new PageResult<>(linkVOList, linkIPage.getTotal(), linkIPage.getCurrent(), linkIPage.getSize(), linkIPage.getPages());
+        return new PageResult<>(linkVOList, linkIPage.getTotal(),
+                linkIPage.getCurrent(), linkIPage.getSize(), linkIPage.getPages());
     }
 
     @Override

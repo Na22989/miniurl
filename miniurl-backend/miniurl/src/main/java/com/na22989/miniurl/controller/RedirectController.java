@@ -34,7 +34,8 @@ public class RedirectController {
      */
     @GetMapping("/s/{shortCode}")
     public void redirect(@PathVariable @Pattern(regexp = "^[0-9a-zA-Z]{1,11}$",
-            message = "非法的短链") String shortCode, HttpServletResponse response, HttpServletRequest request) throws IOException {
+            message = "非法的短链") String shortCode,
+            HttpServletResponse response, HttpServletRequest request) throws IOException {
         String targetUrl  = linkService.redirect(shortCode, request);
         // 输出侧兜底：重定向是 XSS 的最终出口，跳转前再校验一次协议
         if (!UrlSecurityUtil.isSafeHttpUrl(targetUrl)) {

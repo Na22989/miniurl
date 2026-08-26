@@ -101,8 +101,10 @@ class LinkServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        // @RequiredArgsConstructor → LinkServiceImpl(ShortLinkUtil, StringRedisTemplate, BloomFilter, Cache, ApplicationEventPublisher, ObjectMapper, MetricsRecorder)
-        linkService = new LinkServiceImpl(shortLinkUtil, stringRedisTemplate, bloomFilter, shortCodeLocalCache, eventPublisher, objectMapper, recorder);
+        // @RequiredArgsConstructor → LinkServiceImpl(ShortLinkUtil, StringRedisTemplate, BloomFilter,
+        //     Cache, ApplicationEventPublisher, ObjectMapper, MetricsRecorder)
+        linkService = new LinkServiceImpl(shortLinkUtil, stringRedisTemplate, bloomFilter,
+                shortCodeLocalCache, eventPublisher, objectMapper, recorder);
         // 注入父类 ServiceImpl 的 baseMapper（未通过构造器注入）
         ReflectionTestUtils.setField(linkService, "baseMapper", linkMapper);
 
@@ -417,7 +419,8 @@ class LinkServiceImplTest {
         when(shortCodeLocalCache.getIfPresent(SHORT_CODE)).thenReturn(null);
         when(valueOperations.get(anyString())).thenReturn(null);
         when(linkMapper.selectOne(any(LambdaQueryWrapper.class), anyBoolean())).thenReturn(mockLink);
-        when(objectMapper.writeValueAsString(any(LinkCacheValue.class))).thenReturn("{\"linkId\":100,\"longUrl\":\"https://www.baidu.com\"}");
+        when(objectMapper.writeValueAsString(any(LinkCacheValue.class)))
+                .thenReturn("{\"linkId\":100,\"longUrl\":\"https://www.baidu.com\"}");
 
         String result = linkService.redirect(SHORT_CODE, null);
 

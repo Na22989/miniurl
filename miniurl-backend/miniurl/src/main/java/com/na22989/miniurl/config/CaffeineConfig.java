@@ -9,14 +9,14 @@ import org.springframework.context.annotation.Configuration;
 import java.util.concurrent.TimeUnit;
 
 @Configuration
-  public class CaffeineConfig {
+public class CaffeineConfig {
 
-      @Bean
-      public Cache<String, LinkCacheValue> shortCodeLocalCache() {
-          return Caffeine.newBuilder()
-                  .maximumSize(10000)
-                  .expireAfterWrite(5, TimeUnit.MINUTES)
-                  .recordStats()
-                  .build();
-      }
-  }
+    @Bean
+    public Cache<String, LinkCacheValue> shortCodeLocalCache() {
+        return Caffeine.newBuilder()
+                .maximumSize(10000)
+                .expireAfterWrite(5, TimeUnit.MINUTES)
+                .recordStats()
+                .build();
+    }
+}

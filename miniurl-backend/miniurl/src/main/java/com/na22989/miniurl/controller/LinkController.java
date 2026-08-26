@@ -30,7 +30,8 @@ public class LinkController {
      * @return 创建成功的短链接信息
      */
     @PostMapping("/create")
-    public Result<LinkVO> createLink(@RequestAttribute("userId") Long userId,@Valid @RequestBody CreateLinkRequest request) {
+    public Result<LinkVO> createLink(@RequestAttribute("userId") Long userId,
+                                     @Valid @RequestBody CreateLinkRequest request) {
         LinkVO linkVO = linkService.createLink(userId, request);
         return Result.success(linkVO);
     }

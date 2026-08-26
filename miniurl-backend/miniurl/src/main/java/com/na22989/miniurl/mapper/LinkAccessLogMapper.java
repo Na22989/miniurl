@@ -30,7 +30,9 @@ public interface LinkAccessLogMapper extends BaseMapper<LinkAccessLog> {
      * @param maxAccessTime 窗口结束时间，不含该时间点（SQL 用 <，与 StatusServiceImpl 的 [startOfDay, endOfDay) 半开区间一致）
      * @return 独立访客数
      */
-    Long countDistinctIpByLinkIdAndAccessTimeBetween(@Param("linkId")Long linkId, @Param("minAccessTime") LocalDateTime minAccessTime, @Param("maxAccessTime")LocalDateTime maxAccessTime);
+    Long countDistinctIpByLinkIdAndAccessTimeBetween(@Param("linkId") Long linkId,
+            @Param("minAccessTime") LocalDateTime minAccessTime,
+            @Param("maxAccessTime") LocalDateTime maxAccessTime);
 
     /**
      * 根据链接ID和访问时间范围统计每小时的趋势数据
@@ -40,7 +42,9 @@ public interface LinkAccessLogMapper extends BaseMapper<LinkAccessLog> {
      * @param maxAccessTime 访问时间的结束范围，不含该时间点（SQL 用 <，与 StatusServiceImpl 的 [startOfDay, endOfDay) 半开区间一致）
      * @return 返回一个包含每小时状态信息的列表，每个元素代表一个小时的统计数据
      */
-    List<HourlyStatus> countHourlyTrendByLinkIdAndAccessTimeBetween(@Param("linkId")Long linkId, @Param("minAccessTime") LocalDateTime minAccessTime, @Param("maxAccessTime")LocalDateTime maxAccessTime);
+    List<HourlyStatus> countHourlyTrendByLinkIdAndAccessTimeBetween(@Param("linkId") Long linkId,
+            @Param("minAccessTime") LocalDateTime minAccessTime,
+            @Param("maxAccessTime") LocalDateTime maxAccessTime);
 
 
 
