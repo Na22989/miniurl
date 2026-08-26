@@ -1,7 +1,6 @@
 package com.na22989.miniurl.task;
 
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.na22989.miniurl.service.LinkService;
 import lombok.AllArgsConstructor;
 import lombok.Data;

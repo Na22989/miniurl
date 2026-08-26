@@ -3,7 +3,7 @@
 #
 # 触发：push / PR 到 main，或手动 workflow_dispatch（Actions 页 Run workflow）
 #
-# job1 test               干净克隆上跑全量单元测试（./mvnw test），GitHub 托管 runner
+# job1 test               干净克隆上跑 Spotless 格式检查 + 全量单元测试（./mvnw spotless:check test），GitHub 托管 runner
 # job2 docker-compose-test 依赖 job1，compose 构建应用镜像 + 起 mysql/redis/app
 #                           + 健康检查 + 冒烟脚本，模拟容器化部署
 #                           → 跑在 self-hosted runner（miniurl-vm，VM 模拟生产环境）
@@ -48,6 +48,10 @@ jobs:
           java-version: '17'
           distribution: temurin
           cache: maven            # 缓存 ~/.m2，二次构建更快
+
+      - name: Spotless 格式检查
+        # 纯规则模式（removeUnusedImports/trimTrailingWhitespace/endWithNewline），不放行未格式化代码进 CI
+        run: ./mvnw --batch-mode --no-transfer-progress spotless:check
 
       - name: 全量单元测试
         # --batch-mode 关闭交互提示；--no-transfer-progress 精简 Maven 下载日志

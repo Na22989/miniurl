@@ -10,7 +10,6 @@ import com.na22989.miniurl.model.vo.user.UserVO;
 import com.na22989.miniurl.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 
 @RestController

@@ -28,7 +28,6 @@ import com.na22989.miniurl.util.NetUtil;
 import com.na22989.miniurl.util.ShortLinkUtil;
 
 
-import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;

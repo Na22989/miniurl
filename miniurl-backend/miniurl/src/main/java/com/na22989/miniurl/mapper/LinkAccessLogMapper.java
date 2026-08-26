@@ -1,6 +1,5 @@
 package com.na22989.miniurl.mapper;
 import java.time.LocalDateTime;
-import java.util.Date;
 
 import com.na22989.miniurl.model.dto.link.HourlyStatus;
 import org.apache.ibatis.annotations.Param;
