@@ -34,7 +34,7 @@ public class SyncClickCounts2DBTask {
 
     @Scheduled(fixedDelay = 30000)
     public void syncClickCounts2DB() {
-        log.info("开始同步点击数到数据库...");
+        log.info("[点击计数] 开始同步点击数到数据库...");
 
         long startTime = System.currentTimeMillis();
         int totalSynced = 0;
@@ -73,7 +73,7 @@ public class SyncClickCounts2DBTask {
             totalSynced += batchUpdateAndClear(clickSyncDTOS);
         }
 
-        log.info("同步完成，共更新 {} 条记录，耗时 {} ms",
+        log.info("[点击计数] 同步完成，共更新 {} 条记录，耗时 {} ms",
                 totalSynced, System.currentTimeMillis() - startTime);
     }
 
@@ -85,10 +85,10 @@ public class SyncClickCounts2DBTask {
         // 这里不向上抛错，留到log中解决，避免因为一批次的错误导致整个定时任务宕机
         try {
             int synced = linkService.batchUpdateClickCount(clickSyncDTOS);
-            log.debug("批量更新成功，影响 {} 行，共 {} 条记录", synced, clickSyncDTOS.size());
+            log.debug("[点击计数] 批量更新成功，影响 {} 行，共 {} 条记录", synced, clickSyncDTOS.size());
             return synced;
         } catch (Exception e) {
-            log.error("批量更新失败，待重试数据量：{}", clickSyncDTOS.size(), e);
+            log.error("[点击计数] 批量更新失败，待重试数据量：{}", clickSyncDTOS.size(), e);
             // GETDEL 已在读取时删除了 key，失败时必须把计数加回 Redis，否则永久丢失
             for (ClickSyncDTO dto : clickSyncDTOS) {
                 try {

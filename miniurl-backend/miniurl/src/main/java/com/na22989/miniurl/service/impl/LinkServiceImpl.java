@@ -89,7 +89,7 @@ public class LinkServiceImpl  extends ServiceImpl<LinkMapper, Link>
 
     @PostConstruct
     public void initBloomFilter() {
-        log.info("开始加载 shortCode 到布隆过滤器...");
+        log.info("[短链] 开始加载 shortCode 到布隆过滤器...");
 
         try {
             // 分批加载，避免 OOM，主键 id 游标
@@ -117,7 +117,7 @@ public class LinkServiceImpl  extends ServiceImpl<LinkMapper, Link>
                 totalLoaded+= records.size();
                 lastId = records.get(records.size() - 1).getId();
 
-                log.info("已加载 {} 条，当前游标 id={}", totalLoaded, lastId);
+                log.info("[短链] 已加载 {} 条，当前游标 id={}", totalLoaded, lastId);
 
                 // 如果本批次数量小于 batch，说明已经到末尾
                 if (records.size() < batch) {
@@ -125,11 +125,11 @@ public class LinkServiceImpl  extends ServiceImpl<LinkMapper, Link>
                 }
             }
 
-            log.info("布隆过滤器初始化完成！");
+            log.info("[短链] 布隆过滤器初始化完成！");
 
         } catch (Exception e) {
             // 可以降级：记录错误，但不影响服务启动
-            log.error("布隆过滤器初始化失败，服务将继续启动但可能受到缓存穿透影响", e);
+            log.error("[短链] 布隆过滤器初始化失败，服务将继续启动但可能受到缓存穿透影响", e);
         }
     }
 
