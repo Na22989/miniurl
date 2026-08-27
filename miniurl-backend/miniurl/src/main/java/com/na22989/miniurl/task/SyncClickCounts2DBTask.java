@@ -50,16 +50,26 @@ public class SyncClickCounts2DBTask {
                 String key = cursor.next();
 
                 String shortCode = key.substring(CLICK_COUNT_PREFIX.length());
-                // GETDEL：读即取走，原子地返回旧值并删除 key，消除「读-删」窗口的竞态
-                String clickCountStr = stringRedisTemplate.opsForValue().getAndDelete(key);
+                try {
+                    // GETDEL：读即取走，原子地返回旧值并删除 key，消除「读-删」窗口的竞态
+                    String clickCountStr = stringRedisTemplate.opsForValue().getAndDelete(key);
 
-                if (clickCountStr == null) continue;
+                    if (clickCountStr == null) continue;
 
-                int clickCount = Integer.parseInt(clickCountStr);
+                    int clickCount = Integer.parseInt(clickCountStr);
 
-                if (clickCount <= 0) continue;
+                    if (clickCount <= 0) continue;
 
-                clickSyncDTOS.add(new ClickSyncDTO(shortCode, clickCount));
+                    clickSyncDTOS.add(new ClickSyncDTO(shortCode, clickCount));
+                } catch (Exception e) {
+                    // Redis 故障时 GETDEL 失败，increment 写回走同一连接必然同样失败，无法靠补偿恢复；
+                    // 只记录让「计数可能丢失」可见，已取走未落库的批次交给 batchUpdateAndClear 兜底
+                    log.error("[点击计数] GETDEL 读取计数失败 shortCode={}，该短码计数可能丢失，本轮提前结束", shortCode, e);
+                    if (!clickSyncDTOS.isEmpty()) {
+                        totalSynced += batchUpdateAndClear(clickSyncDTOS);
+                    }
+                    break;
+                }
 
                 // 达到批量阈值，批量更新到数据库，避免一次性读取过多keys导致oom
                 if (clickSyncDTOS.size() >= BATCH) {

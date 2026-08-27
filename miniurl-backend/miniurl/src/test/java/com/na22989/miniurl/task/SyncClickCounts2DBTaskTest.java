@@ -107,4 +107,22 @@ class SyncClickCounts2DBTaskTest {
         // verify 时（方法已返回）list 已被清空，内容匹配会误判为空列表。
         verify(linkService).batchUpdateClickCount(anyList());
     }
+
+    @Test
+    @DisplayName("syncClickCounts2DB() GETDEL 抛异常：已取走批次兜底落库并中止本轮")
+    void syncClickCounts2DB_shouldFallbackAndStopWhenGetAndDeleteFails() {
+        when(stringRedisTemplate.scan(any(ScanOptions.class))).thenReturn(cursor);
+        when(cursor.hasNext()).thenReturn(true, true, false);
+        when(cursor.next()).thenReturn(CLICK_COUNT_PREFIX + "abc", CLICK_COUNT_PREFIX + "xyz");
+        when(valueOperations.getAndDelete(CLICK_COUNT_PREFIX + "abc")).thenReturn("5");
+        when(valueOperations.getAndDelete(CLICK_COUNT_PREFIX + "xyz")).thenThrow(new RuntimeException("redis down"));
+        when(linkService.batchUpdateClickCount(anyList())).thenReturn(1);
+
+        task.syncClickCounts2DB();
+
+        // abc 已取走 → 异常时兜底落库（catch 里的 batchUpdateAndClear），否则随方法栈丢失
+        verify(linkService).batchUpdateClickCount(anyList());
+        // xyz 抛异常后 break，getAndDelete 只到 abc/xyz 两次，不再继续扫剩余 key
+        verify(valueOperations, times(2)).getAndDelete(anyString());
+    }
 }
