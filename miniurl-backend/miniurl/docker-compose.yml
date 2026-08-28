@@ -115,6 +115,24 @@ services:
     # 说明：应用已引入 actuator（/actuator/health 可探活），但镜像未装 curl，故未配 healthcheck；
     # 应用日志写到容器内 /app/logs/miniurl.log（Dockerfile WORKDIR=/app，appuser 有写权限）
 
+  # ---------- 前端静态服务 ----------
+  frontend:
+    build:
+      context: ../../miniurl-frontend    # compose 文件在 miniurl-backend/miniurl/，前端在仓库根 miniurl-frontend/
+      dockerfile: Dockerfile
+    image: miniurl-frontend:latest
+    container_name: miniurl-frontend
+    restart: unless-stopped
+    # 不对外暴露端口：所有流量经主 nginx 分流进入，前端容器只服务静态资源
+    healthcheck:
+      # busybox wget 探活；用 127.0.0.1 而非 localhost（容器内 localhost 可能解析到 ::1，
+      # 而 nginx.conf 的 listen 80 默认只绑 IPv4，探活会失败）
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
   # ---------- Nginx 反向代理 + 限速（对外入口） ----------
   nginx:
     image: nginx:alpine
@@ -129,6 +147,8 @@ services:
       # 只保证启动顺序（app 未配 healthcheck，无法用 service_healthy）；
       # nginx 上游 miniurl-app:9191 在 compose 网络内自动解析，app 未就绪时短暂 502 属正常
       - miniurl-app
+      # 前端同理：静态资源由 nginx 反向代理，仅保证启动顺序
+      - frontend
     healthcheck:
       # busybox wget 探活；/actuator/health 在 nginx 配置里精确匹配免限速。
       # 探活必须用 127.0.0.1：容器内 localhost 解析到 ::1（IPv6），而挂载的 nginx.conf 只监听 IPv4
