@@ -37,6 +37,9 @@ class GlobalRateLimitInterceptorTest {
     @Mock
     private StringRedisTemplate stringRedisTemplate;
 
+    @Mock
+    private RedisScript<List<Long>> rateLimitScript;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private GlobalRateLimitInterceptor interceptor;
@@ -47,14 +50,12 @@ class GlobalRateLimitInterceptorTest {
 
     @BeforeEach
     void setUp() {
-        interceptor = new GlobalRateLimitInterceptor(stringRedisTemplate, objectMapper);
+        interceptor = new GlobalRateLimitInterceptor(stringRedisTemplate, objectMapper, rateLimitScript);
         // @Value 字段在非 Spring 环境不会自动注入，手动注入默认配置（启用，100 req/s）
         ReflectionTestUtils.setField(interceptor, "enabled", true);
         ReflectionTestUtils.setField(interceptor, "tokensPerSecond", 100);
         ReflectionTestUtils.setField(interceptor, "maxTokens", 100);
-        // 加载真实 Lua 脚本（lua/rate_limit.lua 在 main classpath），Fail-Fast 语义由 init() 承载
-        interceptor.init();
-
+        // rateLimitScript 由 RedisLuaScripts @Bean 注入（Bean 加载即 fail-fast），此处 mock 仅占位
         request = new MockHttpServletRequest();
         response = new MockHttpServletResponse();
     }

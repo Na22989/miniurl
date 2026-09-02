@@ -3,10 +3,12 @@ package com.na22989.miniurl.interceptor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.na22989.miniurl.common.Result;
 import com.na22989.miniurl.common.ResultCodeEnum;
+import com.na22989.miniurl.monitor.MetricsRecorder;
 import com.na22989.miniurl.util.JwtUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
@@ -17,11 +19,13 @@ import static com.na22989.miniurl.common.RedisKeyConstant.BLACKLIST_KEY_PREFIX;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class LoginInterceptor implements HandlerInterceptor {
 
     private final JwtUtil jwtUtil;
     private final ObjectMapper objectMapper;
     private final StringRedisTemplate stringRedisTemplate;
+    private final MetricsRecorder recorder;
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
@@ -46,7 +50,16 @@ public class LoginInterceptor implements HandlerInterceptor {
         Long userId = jwtUtil.extractUserId(token);
 
         // 黑名单校验：若 token 签发时间早于拉黑时间，说明登录后已被主动失效
-        String blackListTimeStr = stringRedisTemplate.opsForValue().get(BLACKLIST_KEY_PREFIX + userId);
+        String blackListTimeStr;
+        try {
+            blackListTimeStr = stringRedisTemplate.opsForValue().get(BLACKLIST_KEY_PREFIX + userId);
+        } catch (Exception e) {
+            // Redis 不可用：按"未拉黑"降级（fail-open）。代价是已拉黑 token 在故障窗口内可复用，
+            // 权衡：fail-close 会让所有用户全挂；fail-open 风险仅限已拉黑 token 持有者，且 JWT 自身 exp 兜底
+            log.warn("[鉴权] Redis 黑名单读取失败 userId={}，降级按未拉黑处理", userId, e);
+            recorder.recordRedisDegraded("blacklist_get");
+            blackListTimeStr = null;
+        }
         if (blackListTimeStr != null) {
             long blackListTime = Long.parseLong(blackListTimeStr);
             if (blackListTime > jwtUtil.extractIssuedAt(token).getTime()) {

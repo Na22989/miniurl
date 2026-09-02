@@ -33,6 +33,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Duration;
@@ -77,6 +78,9 @@ class LinkServiceImplTest {
     @Mock
     private MetricsRecorder recorder;
 
+    @Mock
+    private RedisScript<Long> releaseLockScript;
+
     private LinkServiceImpl linkService;
 
     private CreateLinkRequest createRequest;
@@ -102,11 +106,14 @@ class LinkServiceImplTest {
     @BeforeEach
     void setUp() {
         // @RequiredArgsConstructor → LinkServiceImpl(ShortLinkUtil, StringRedisTemplate, BloomFilter,
-        //     Cache, ApplicationEventPublisher, ObjectMapper, MetricsRecorder)
+        //     Cache, ApplicationEventPublisher, ObjectMapper, MetricsRecorder, RedisScript<Long>)
         linkService = new LinkServiceImpl(shortLinkUtil, stringRedisTemplate, bloomFilter,
-                shortCodeLocalCache, eventPublisher, objectMapper, recorder);
+                shortCodeLocalCache, eventPublisher, objectMapper, recorder, releaseLockScript);
         // 注入父类 ServiceImpl 的 baseMapper（未通过构造器注入）
         ReflectionTestUtils.setField(linkService, "baseMapper", linkMapper);
+        // bloomReady 由 @PostConstruct initBloomFilter 置位，单测不启 Spring → 手动置 true，
+        // 让 redirect() 走布隆守卫（否则 mightContain 分支永不执行，布隆相关用例全部失效）
+        ReflectionTestUtils.setField(linkService, "bloomReady", true);
 
         // 让 stringRedisTemplate.opsForValue() 返回 mock（lenient：部分测试不走 redirect，用不到）
         lenient().when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
@@ -175,8 +182,28 @@ class LinkServiceImplTest {
         assertNotNull(result);
         // 负 TTL → Redis 缓存写入被跳过（否则会把已过期短链缓存起来，永远命中到过期链接）
         verify(valueOperations, never()).set(anyString(), anyString(), any(Duration.class));
-        // 本地缓存不设 TTL，照写（布隆/本地不判过期，靠 DB 兜底）
+        // 本地缓存不设 TTL，照写（命中路径按 expireTime 校验，过期即失效）
         verify(shortCodeLocalCache).put(eq(SHORT_CODE), any(LinkCacheValue.class));
+    }
+
+    @Test
+    @DisplayName("createLink() expireTime 临近 → Redis TTL = 剩余时间 + 1~5min 抖动（不 clamp）")
+    void createLink_redisTtl_jitterExtendsBeyondRemaining() {
+        when(shortLinkUtil.nextId()).thenReturn(LINK_ID);
+        when(shortLinkUtil.base62Encode(LINK_ID)).thenReturn(SHORT_CODE);
+        when(linkMapper.insert(isA(Link.class))).thenReturn(1);
+
+        createRequest.setExpireTime(LocalDateTime.now().plusMinutes(1)); // 剩余 ~1min（< 1h 上限）
+
+        linkService.createLink(USER_ID, createRequest);
+
+        // P1-4 语义：TTL = min(1h, remaining) + (60~299)s 抖动，不再 clamp 回 remaining。
+        // 下界 >60s 正是旧 clamp 行为（≤60s）的反向证明；死 key 滞留 ≤5min 由命中路径 isExpired 兜底。
+        ArgumentCaptor<Duration> ttlCaptor = ArgumentCaptor.forClass(Duration.class);
+        verify(valueOperations).set(anyString(), any(), ttlCaptor.capture());
+        long ttlSeconds = ttlCaptor.getValue().getSeconds();
+        assertTrue(ttlSeconds > 60, "抖动应让 TTL 越过剩余时间（旧实现 clamp 到 ≤60s），实际=" + ttlSeconds);
+        assertTrue(ttlSeconds < 360, "TTL 不应超过 remaining(~60s) + 抖动上限(299s)，实际=" + ttlSeconds);
     }
 
     // ─── listUserLinks ───
@@ -320,6 +347,7 @@ class LinkServiceImplTest {
         when(bloomFilter.mightContain(SHORT_CODE)).thenReturn(true);
         when(shortCodeLocalCache.getIfPresent(SHORT_CODE)).thenReturn(null);
         when(valueOperations.get(anyString())).thenReturn(null);
+        when(valueOperations.setIfAbsent(anyString(), anyString(), any(Duration.class))).thenReturn(true);
         // MP getOne() → baseMapper.selectOne(wrapper, true)
         when(linkMapper.selectOne(any(LambdaQueryWrapper.class), anyBoolean())).thenReturn(mockLink);
 
@@ -336,6 +364,7 @@ class LinkServiceImplTest {
         when(bloomFilter.mightContain(SHORT_CODE)).thenReturn(true);
         when(shortCodeLocalCache.getIfPresent(SHORT_CODE)).thenReturn(null);
         when(valueOperations.get(anyString())).thenReturn(null);
+        when(valueOperations.setIfAbsent(anyString(), anyString(), any(Duration.class))).thenReturn(true);
         when(linkMapper.selectOne(any(LambdaQueryWrapper.class), anyBoolean())).thenReturn(null);
 
         BizException ex = assertThrows(BizException.class,
@@ -364,6 +393,7 @@ class LinkServiceImplTest {
         when(bloomFilter.mightContain(SHORT_CODE)).thenReturn(true);
         when(shortCodeLocalCache.getIfPresent(SHORT_CODE)).thenReturn(null);
         when(valueOperations.get(anyString())).thenReturn(null);
+        when(valueOperations.setIfAbsent(anyString(), anyString(), any(Duration.class))).thenReturn(true);
         when(linkMapper.selectOne(any(LambdaQueryWrapper.class), anyBoolean())).thenReturn(mockLink);
 
         BizException ex = assertThrows(BizException.class,
@@ -418,6 +448,7 @@ class LinkServiceImplTest {
         when(bloomFilter.mightContain(SHORT_CODE)).thenReturn(true);
         when(shortCodeLocalCache.getIfPresent(SHORT_CODE)).thenReturn(null);
         when(valueOperations.get(anyString())).thenReturn(null);
+        when(valueOperations.setIfAbsent(anyString(), anyString(), any(Duration.class))).thenReturn(true);
         when(linkMapper.selectOne(any(LambdaQueryWrapper.class), anyBoolean())).thenReturn(mockLink);
         when(objectMapper.writeValueAsString(any(LinkCacheValue.class)))
                 .thenReturn("{\"linkId\":100,\"longUrl\":\"https://www.baidu.com\"}");
@@ -435,5 +466,148 @@ class LinkServiceImplTest {
         assertEquals(LINK_ID, eventCaptor.getValue().getLinkId(), "DB 命中事件必须携带 linkId");
 
         verify(recorder).recordRedirect("db");
+    }
+
+    @Test
+    @DisplayName("redirect() L1 命中值已过期 → 视为 miss 并失效，最终由 DB 抛 LINK_EXPIRED")
+    void redirect_shouldThrowExpiredWhenL1ValueExpired() {
+        LinkCacheValue expiredValue = new LinkCacheValue(
+                LINK_ID, "https://www.baidu.com", LocalDateTime.now().minusMinutes(1));
+        mockLink.setExpireTime(LocalDateTime.now().minusDays(1));
+        when(bloomFilter.mightContain(SHORT_CODE)).thenReturn(true);
+        when(shortCodeLocalCache.getIfPresent(SHORT_CODE)).thenReturn(expiredValue);
+        when(valueOperations.get(anyString())).thenReturn(null);
+        when(valueOperations.setIfAbsent(anyString(), anyString(), any(Duration.class))).thenReturn(true);
+        when(linkMapper.selectOne(any(LambdaQueryWrapper.class), anyBoolean())).thenReturn(mockLink);
+
+        BizException ex = assertThrows(BizException.class, () -> linkService.redirect(SHORT_CODE, null));
+        assertEquals(ResultCodeEnum.LINK_EXPIRED.getCode(), ex.getCode());
+
+        verify(shortCodeLocalCache).invalidate(SHORT_CODE);
+        verify(recorder).recordExpiredReject("l1");  // P1-5：L1 过期命中单独计量
+        verify(recorder, never()).recordRedirect("l1");
+        verify(recorder).recordRedirectFail("expired");
+    }
+
+    @Test
+    @DisplayName("redirect() L2 命中值已过期 → 视为 miss 并清理，最终由 DB 抛 LINK_EXPIRED")
+    void redirect_shouldThrowExpiredWhenL2ValueExpired() throws Exception {
+        LinkCacheValue expiredValue = new LinkCacheValue(
+                LINK_ID, "https://www.baidu.com", LocalDateTime.now().minusMinutes(1));
+        mockLink.setExpireTime(LocalDateTime.now().minusDays(1));
+        when(bloomFilter.mightContain(SHORT_CODE)).thenReturn(true);
+        when(shortCodeLocalCache.getIfPresent(SHORT_CODE)).thenReturn(null);
+        when(valueOperations.get(anyString()))
+                .thenReturn("{\"linkId\":100,\"longUrl\":\"https://www.baidu.com\",\"expireTime\":\"2020-01-01T00:00:00\"}",
+                        null); // 快路径命中过期值 → 清理；double-check 已不命中，避免同一过期值重复计量
+        when(objectMapper.readValue(anyString(), eq(LinkCacheValue.class))).thenReturn(expiredValue);
+        when(valueOperations.setIfAbsent(anyString(), anyString(), any(Duration.class))).thenReturn(true);
+        when(linkMapper.selectOne(any(LambdaQueryWrapper.class), anyBoolean())).thenReturn(mockLink);
+
+        BizException ex = assertThrows(BizException.class, () -> linkService.redirect(SHORT_CODE, null));
+        assertEquals(ResultCodeEnum.LINK_EXPIRED.getCode(), ex.getCode());
+
+        verify(stringRedisTemplate, atLeastOnce()).delete(SHORT_CODE_PREFIX + SHORT_CODE);
+        verify(shortCodeLocalCache, atLeastOnce()).invalidate(SHORT_CODE);
+        verify(recorder).recordExpiredReject("l2");  // P1-5：L2 过期命中单独计量
+        verify(recorder, never()).recordRedirect("l2");
+        verify(recorder).recordRedirectFail("expired");
+    }
+
+    // ─── 分布式锁 + 自旋（P1-1）───
+
+    @Test
+    @DisplayName("redirect() 抢锁失败自旋 → 锁持有者重建完成后第二轮读到 L2 即返回（不查 DB）")
+    void redirect_lockContended_spinShouldReturnWhenHolderRebuildsL2() throws Exception {
+        when(bloomFilter.mightContain(SHORT_CODE)).thenReturn(true);
+        // 快路径(锁前) miss；自旋第 1 轮仍 miss；第 2 轮持有者已重建 → 命中即返回
+        when(valueOperations.get(anyString())).thenReturn(null, null,
+                "{\"linkId\":100,\"longUrl\":\"https://www.baidu.com\"}");
+        when(objectMapper.readValue(anyString(), eq(LinkCacheValue.class)))
+                .thenReturn(new LinkCacheValue(LINK_ID, "https://www.baidu.com"));
+        when(valueOperations.setIfAbsent(anyString(), anyString(), any(Duration.class))).thenReturn(false);
+
+        String result = linkService.redirect(SHORT_CODE, null);
+
+        assertEquals("https://www.baidu.com", result);
+        verify(linkMapper, never()).selectOne(any(LambdaQueryWrapper.class), anyBoolean());
+        verify(recorder).recordRedirect("l2");
+    }
+
+    @Test
+    @DisplayName("redirect() 自旋耗尽预算仍未见到重建 → 直查 DB 兜底（宁可多查一次也不丢请求）")
+    void redirect_lockContended_spinShouldFallBackToDbOnTimeout() {
+        when(bloomFilter.mightContain(SHORT_CODE)).thenReturn(true);
+        when(valueOperations.get(anyString())).thenReturn(null);  // 全程无人重建
+        when(valueOperations.setIfAbsent(anyString(), anyString(), any(Duration.class))).thenReturn(false);
+        when(linkMapper.selectOne(any(LambdaQueryWrapper.class), anyBoolean())).thenReturn(mockLink);
+
+        String result = linkService.redirect(SHORT_CODE, null);
+
+        assertEquals("https://www.baidu.com", result);
+        verify(recorder).recordRedirect("db");
+    }
+
+    @Test
+    @DisplayName("redirect() Redis 不可用 → 快路径/抢锁/自旋逐级降级，自旋 abort 后直查 DB")
+    void redirect_lockContended_spinShouldAbortWhenRedisDown() {
+        when(bloomFilter.mightContain(SHORT_CODE)).thenReturn(true);
+        when(valueOperations.get(anyString())).thenThrow(new RuntimeException("Redis 故障"));
+        when(valueOperations.setIfAbsent(anyString(), anyString(), any(Duration.class)))
+                .thenThrow(new RuntimeException("Redis 故障"));
+        when(linkMapper.selectOne(any(LambdaQueryWrapper.class), anyBoolean())).thenReturn(mockLink);
+
+        String result = linkService.redirect(SHORT_CODE, null);
+
+        assertEquals("https://www.baidu.com", result);
+        // 已确认 Redis 不可用 → 自旋 abort（否则把 1 次超时放大成 N 次）；三层降级均需可观测
+        verify(recorder).recordRedisDegraded("l2_get");
+        verify(recorder).recordRedisDegraded("lock_acquire");
+        verify(recorder).recordRedisDegraded("l2_get_spin");
+        verify(recorder).recordRedirect("db");
+    }
+
+    @Test
+    @DisplayName("redirect() 抢到锁 → double-check 发现他人已重建 L2 → 直接返回不重建")
+    void redirect_lockAcquired_doubleCheckShouldReturnWithoutDb() throws Exception {
+        when(bloomFilter.mightContain(SHORT_CODE)).thenReturn(true);
+        // 快路径 miss；double-check（锁后）命中他人刚写好的值，无需自己查 DB
+        when(valueOperations.get(anyString())).thenReturn(null,
+                "{\"linkId\":100,\"longUrl\":\"https://www.baidu.com\"}");
+        when(objectMapper.readValue(anyString(), eq(LinkCacheValue.class)))
+                .thenReturn(new LinkCacheValue(LINK_ID, "https://www.baidu.com"));
+        when(valueOperations.setIfAbsent(anyString(), anyString(), any(Duration.class))).thenReturn(true);
+
+        String result = linkService.redirect(SHORT_CODE, null);
+
+        assertEquals("https://www.baidu.com", result);
+        verify(linkMapper, never()).selectOne(any(LambdaQueryWrapper.class), anyBoolean());
+        verify(recorder).recordRedirect("l2");
+    }
+
+    @Test
+    @DisplayName("redirect() 抢到锁 → double-check 再次命中同一 L2 过期值（delete 失败残留）→ 连续拦截，最终由 DB 抛 LINK_EXPIRED")
+    void redirect_lockAcquired_doubleCheckShouldRejectExpiredValueAgain() throws Exception {
+        LinkCacheValue expiredValue = new LinkCacheValue(
+                LINK_ID, "https://www.baidu.com", LocalDateTime.now().minusMinutes(1));
+        mockLink.setExpireTime(LocalDateTime.now().minusDays(1));
+        when(bloomFilter.mightContain(SHORT_CODE)).thenReturn(true);
+        // 快路径 + double-check 都读到同一过期值：delete 连续失败，Redis 一直残留旧值
+        when(valueOperations.get(anyString()))
+                .thenReturn("{\"linkId\":100,\"longUrl\":\"https://www.baidu.com\",\"expireTime\":\"2020-01-01T00:00:00\"}");
+        when(objectMapper.readValue(anyString(), eq(LinkCacheValue.class))).thenReturn(expiredValue);
+        when(valueOperations.setIfAbsent(anyString(), anyString(), any(Duration.class))).thenReturn(true);
+        // 模拟清理失败：过期值未被删掉，double-check 才会命中同一过期值（而非两段 stub 的 null）
+        doThrow(new RuntimeException("Redis delete 失败")).when(stringRedisTemplate).delete(anyString());
+        when(linkMapper.selectOne(any(LambdaQueryWrapper.class), anyBoolean())).thenReturn(mockLink);
+
+        BizException ex = assertThrows(BizException.class, () -> linkService.redirect(SHORT_CODE, null));
+        assertEquals(ResultCodeEnum.LINK_EXPIRED.getCode(), ex.getCode());
+
+        // 连续拦截契约：快路径与 double-check 各按过期拒一次（共 2 次），过期值绝不按命中计 redirect
+        verify(recorder, times(2)).recordExpiredReject("l2");
+        verify(recorder, times(2)).recordRedisDegraded("l2_delete");
+        verify(recorder, never()).recordRedirect("l2");
+        verify(recorder).recordRedirectFail("expired");
     }
 }

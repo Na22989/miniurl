@@ -9,15 +9,12 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Component;
-import org.springframework.util.FileCopyUtils;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
 
@@ -49,10 +46,16 @@ public class RateLimitInterceptor implements HandlerInterceptor {
     private final StringRedisTemplate stringRedisTemplate;
     private final ObjectMapper objectMapper;
 
+    // Lua 脚本：RedisLuaScripts @Bean 统一加载。字段名与 Bean 名一致，让 Spring 在
+    // 两个 RedisScript<List<Long>> 候选间按名消歧（IP 与用户脚本类型相同，无法仅按类型区分）
+    private final RedisScript<List<Long>> rateLimitScript;
+
     public RateLimitInterceptor(StringRedisTemplate stringRedisTemplate,
-                                ObjectMapper objectMapper) {
+                                ObjectMapper objectMapper,
+                                RedisScript<List<Long>> rateLimitScript) {
         this.stringRedisTemplate = stringRedisTemplate;
         this.objectMapper = objectMapper;
+        this.rateLimitScript = rateLimitScript;
     }
 
     // 配置项
@@ -69,40 +72,18 @@ public class RateLimitInterceptor implements HandlerInterceptor {
     @Value("${rate-limit.proxies-to-trust:0}")
     private int proxiesToTrust;
 
-    // Lua 脚本
-
-    private DefaultRedisScript<List<Long>> rateLimitScript;
-
     /**
-     * 启动时加载 Lua 脚本
-     * <p>
-     * 如果加载失败，服务启动失败（符合 Fail-Fast 原则）
+     * 启动时输出限流配置状态。脚本本身由 RedisLuaScripts @Bean 统一加载（fail-fast），
+     * 此处仅保留原有启动诊断日志，禁用与否都让运维一眼可见。
      */
     @PostConstruct
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    public void init() {
+    public void logStartupState() {
         if (!enabled) {
             log.info("[限流] 限流功能已禁用");
             return;
         }
-
-        try {
-            ClassPathResource resource = new ClassPathResource("lua/rate_limit.lua");
-            byte[] scriptBytes = FileCopyUtils.copyToByteArray(resource.getInputStream());
-            String scriptContent = new String(scriptBytes, StandardCharsets.UTF_8);
-
-            rateLimitScript = new DefaultRedisScript<>();
-            rateLimitScript.setScriptText(scriptContent);
-            // List.class 是原始类型 Class<List>，强转适配泛型擦除
-            rateLimitScript.setResultType((Class) List.class);
-
-            log.info("[限流] Lua 脚本加载成功 | 速率={}个/秒 | 容量={} | 可信代理层级={}",
-                    tokensPerSecond, maxTokens, proxiesToTrust);
-
-        } catch (IOException e) {
-            log.error("[限流] Lua 脚本加载失败，服务启动失败", e);
-            throw new IllegalStateException("限流 Lua 脚本加载失败", e);
-        }
+        log.info("[限流] Lua 脚本加载成功 | 速率={}个/秒 | 容量={} | 可信代理层级={}",
+                tokensPerSecond, maxTokens, proxiesToTrust);
     }
 
     @Override

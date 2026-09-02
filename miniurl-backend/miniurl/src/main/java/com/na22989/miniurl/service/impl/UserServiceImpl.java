@@ -13,10 +13,12 @@ import com.na22989.miniurl.model.entity.User;
 import com.na22989.miniurl.model.vo.user.LoginUserVO;
 import com.na22989.miniurl.model.vo.user.RefreshTokenVO;
 import com.na22989.miniurl.model.vo.user.UserVO;
+import com.na22989.miniurl.monitor.MetricsRecorder;
 import com.na22989.miniurl.service.UserService;
 import com.na22989.miniurl.util.JwtUtil;
 import io.micrometer.common.util.StringUtils;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -31,6 +33,7 @@ import static com.na22989.miniurl.common.RedisKeyConstant.BLACKLIST_KEY_PREFIX;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         implements UserService {
 
@@ -41,6 +44,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     private static final String DEFAULT_PREFIX = "user_";
 
     private final StringRedisTemplate stringRedisTemplate;
+
+    private final MetricsRecorder recorder;
 
     @Value("${jwt.refresh-expiration}")
     private Long refreshExpiration;
@@ -147,7 +152,16 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         // 从 refresh token 解出 userId（不信任外部传入，防止越权换 token）
         Long userId = jwtUtil.extractUserId(refreshToken);
 
-        String blackListTimeStr = stringRedisTemplate.opsForValue().get(BLACKLIST_KEY_PREFIX + userId);
+        String blackListTimeStr;
+        try {
+            blackListTimeStr = stringRedisTemplate.opsForValue().get(BLACKLIST_KEY_PREFIX + userId);
+        } catch (Exception e) {
+            // Redis 不可用：按"未拉黑"降级（fail-open）。代价是已拉黑 token 在故障窗口内可复用，
+            // 权衡：fail-close 会让所有用户全挂；fail-open 风险仅限已拉黑 token 持有者，且 JWT 自身 exp 兜底
+            log.warn("[鉴权] Redis 黑名单读取失败 userId={}，降级按未拉黑处理", userId, e);
+            recorder.recordRedisDegraded("blacklist_get");
+            blackListTimeStr = null;
+        }
         if (blackListTimeStr != null) {
             long blackListTime = Long.parseLong(blackListTimeStr);
             if (blackListTime > jwtUtil.extractIssuedAt(refreshToken).getTime()) {

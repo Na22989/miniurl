@@ -27,4 +27,7 @@ public final class RedisKeyConstant {
 
     /** 全局限流（令牌桶），key 格式 rate:global:{action}，全局共享不分维度 */
     public static final String RATE_GLOBAL_KEY_PREFIX = "rate:global:";
+
+    /** 短链重建锁（缓存击穿单飞）：value 为持锁者 UUID，TTL 5s */
+    public static final String SHORT_CODE_LOCK_PREFIX = "shortlink:rebuild:lock:";
 }

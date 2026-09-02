@@ -10,6 +10,7 @@ import com.na22989.miniurl.model.entity.User;
 import com.na22989.miniurl.model.vo.user.LoginUserVO;
 import com.na22989.miniurl.model.vo.user.RefreshTokenVO;
 import com.na22989.miniurl.model.vo.user.UserVO;
+import com.na22989.miniurl.monitor.MetricsRecorder;
 import com.na22989.miniurl.util.JwtUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -62,6 +63,9 @@ class UserServiceImplTest {
     @Mock
     private ValueOperations<String, String> valueOperations;
 
+    @Mock
+    private MetricsRecorder recorder;
+
     private UserServiceImpl userService;
 
     private RegisterRequest registerRequest;
@@ -70,8 +74,8 @@ class UserServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        // @RequiredArgsConstructor → UserServiceImpl(JwtUtil, PasswordEncoder, StringRedisTemplate)
-        userService = new UserServiceImpl(jwtUtil, passwordEncoder, stringRedisTemplate);
+        // @RequiredArgsConstructor → UserServiceImpl(JwtUtil, PasswordEncoder, StringRedisTemplate, MetricsRecorder)
+        userService = new UserServiceImpl(jwtUtil, passwordEncoder, stringRedisTemplate, recorder);
         // 注入父类 ServiceImpl 的 baseMapper（未通过构造器注入）
         ReflectionTestUtils.setField(userService, "baseMapper", userMapper);
         // logout 的 TTL 依赖该 @Value 字段（非 Spring 环境下需手动注入）
@@ -281,5 +285,25 @@ class UserServiceImplTest {
 
         RefreshTokenVO result = userService.refreshToken(request);
         assertEquals("new-access-token", result.getAccessToken());
+    }
+
+    @Test
+    @DisplayName("refreshToken() Redis 黑名单读取失败 → fail-open 按未拉黑换发新 token，并打 blacklist_get 指标")
+    void refreshToken_shouldFailOpenWhenRedisDown() {
+        RefreshTokenRequest request = new RefreshTokenRequest();
+        request.setRefreshToken("valid-refresh-token");
+
+        when(jwtUtil.validateToken("valid-refresh-token", "refresh")).thenReturn(true);
+        when(jwtUtil.extractUserId("valid-refresh-token")).thenReturn(1L);
+        when(valueOperations.get("jwt:blacklist:1"))
+                .thenThrow(new RuntimeException("Redis 故障"));
+        when(jwtUtil.generateAccessToken(1L)).thenReturn("new-access-token");
+
+        RefreshTokenVO result = userService.refreshToken(request);
+
+        assertNotNull(result);
+        assertEquals("new-access-token", result.getAccessToken());
+        // 降级需可观测：fail-open 的窗口代价是已拉黑 token 可复用，指标便于后续评估
+        verify(recorder).recordRedisDegraded("blacklist_get");
     }
 }

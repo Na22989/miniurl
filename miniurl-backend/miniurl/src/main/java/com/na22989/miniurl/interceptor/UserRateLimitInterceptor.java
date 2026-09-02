@@ -8,15 +8,12 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Component;
-import org.springframework.util.FileCopyUtils;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
 
@@ -47,9 +44,17 @@ public class UserRateLimitInterceptor implements HandlerInterceptor {
     private final StringRedisTemplate stringRedisTemplate;
     private final ObjectMapper objectMapper;
 
-    public UserRateLimitInterceptor(StringRedisTemplate stringRedisTemplate, ObjectMapper objectMapper) {
+    // Lua 脚本：RedisLuaScripts @Bean 统一加载。字段名与 Bean 名一致，让 Spring 在
+    // 两个 RedisScript<List<Long>> 候选间按名消歧——这里必须是 rateLimitUserScript，
+    // 否则会误注入 IP 限流的 rate_limit.lua（用户限流是 rate_limit_user.lua，语义不同）
+    private final RedisScript<List<Long>> rateLimitUserScript;
+
+    public UserRateLimitInterceptor(StringRedisTemplate stringRedisTemplate,
+                                    ObjectMapper objectMapper,
+                                    RedisScript<List<Long>> rateLimitUserScript) {
         this.stringRedisTemplate = stringRedisTemplate;
         this.objectMapper = objectMapper;
+        this.rateLimitUserScript = rateLimitUserScript;
     }
 
     @Value("${rate-limit.user.enabled:true}")
@@ -61,39 +66,18 @@ public class UserRateLimitInterceptor implements HandlerInterceptor {
     @Value("${rate-limit.user.max-requests:50}")
     private int maxRequests;
 
-    private DefaultRedisScript<List<Long>> rateLimitScript;
-
-
-
     /**
-     * 启动时加载 Lua 脚本
-     * <p>
-     * 如果加载失败，服务启动失败（符合 Fail-Fast 原则）
+     * 启动时输出限流配置状态。脚本本身由 RedisLuaScripts @Bean 统一加载（fail-fast），
+     * 此处仅保留原有启动诊断日志，禁用与否都让运维一眼可见。
      */
     @PostConstruct
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    public void init() {
+    public void logStartupState() {
         if (!enabled) {
             log.info("[滑动窗口] 滑动窗口功能已禁用");
             return;
         }
-
-        try {
-            ClassPathResource resource = new ClassPathResource("lua/rate_limit_user.lua");
-            byte[] scriptBytes = FileCopyUtils.copyToByteArray(resource.getInputStream());
-            String scriptContent = new String(scriptBytes, StandardCharsets.UTF_8);
-
-            rateLimitScript = new DefaultRedisScript<>();
-            rateLimitScript.setScriptText(scriptContent);
-            // List.class 是原始类型 Class<List>，强转适配泛型擦除
-            rateLimitScript.setResultType((Class) List.class);
-
-            log.info("[滑动窗口] Lua 脚本加载成功 | 滑动窗口长度={}毫秒 | 滑动窗口请求上限={}", windowMs, maxRequests);
-
-        } catch (IOException e) {
-            log.error("[滑动窗口] Lua 脚本加载失败，服务启动失败", e);
-            throw new IllegalStateException("滑动窗口 Lua 脚本加载失败", e);
-        }
+        log.info("[滑动窗口] Lua 脚本加载成功 | 滑动窗口长度={}毫秒 | 滑动窗口请求上限={}",
+                windowMs, maxRequests);
     }
 
     @Override
@@ -141,7 +125,7 @@ public class UserRateLimitInterceptor implements HandlerInterceptor {
             // ARGV[3] = now_ms (当前毫秒时间戳)
             // ARGV[4] = 请求唯一标识（Java: String.valueOf(System.nanoTime())）
             List<Long> result = stringRedisTemplate.execute(
-                    rateLimitScript,
+                    rateLimitUserScript,
                     Collections.singletonList(key),
                     String.valueOf(windowMs),
                     String.valueOf(maxRequests),
