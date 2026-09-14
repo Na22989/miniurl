@@ -1,8 +1,17 @@
 #!/bin/bash
 
+# 批量创建短码，产出 shortcodes.csv 供 JMeter 跳转压测使用。
+#
+# 用法：
+#   MINIURL_TOKEN=<accessToken> bash BatchCreateShortCode.sh
+#
+# token 获取：POST /api/user/login，从响应里取 data.accessToken（有效期 30 分钟，
+# 100 条约几秒跑完，通常不会中途过期）。
+# token 不入库：它是有时效的凭证，写进脚本再提交等于把凭证留在仓库历史里。
+
 # ===== 环境变量配置 =====
-BASE_URL="http://localhost:9191"
-TOKEN="eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjgsInN1YiI6IjgiLCJpYXQiOjE3ODYxODU2MTcsImV4cCI6MTc4Njc5MDQxN30.nmr0vA3I4li4EIRoSBatv8ZmfcW8ngOK1mIY-IHO4oo"
+BASE_URL="${BASE_URL:-http://localhost:9191}"
+TOKEN="${MINIURL_TOKEN:?未设置 MINIURL_TOKEN：请先登录获取 accessToken 后传入}"
 # ========================
 
 echo "shortCode" > shortcodes.csv

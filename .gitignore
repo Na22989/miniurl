@@ -7,6 +7,11 @@
 #           设计文档（docs/、PRD、TECH_DESIGN、CLAUDE.md 等）最后阶段统一重写后再入库。
 # ============================================================
 
+# ---------- 环境变量 / 密钥 ----------
+# .env 存放真实口令与 JWT 密钥，只在本机存在，绝不入库；
+# .env.example 是提交进仓库的模板（只有键名和说明，无真实值），不受此规则影响
+.env
+
 # ---------- 依赖 / 二进制 ----------
 # jar/：本地下载的依赖 jar 副本（87M），不入库
 jar/
@@ -31,6 +36,12 @@ linux-lab/
 # 以下为压测结果汇总 CSV（含 33M 的 scene03 结果），属生成物，忽略
 JmeterTest/Summary_*.csv
 JmeterTest/summary*.csv
+
+# 压测运行日志与备份文件
+jmeter.log
+**/jmeter.log
+*.bak.csv
+*.historical-8char.bak.csv
 
 # ---------- 运行日志 ----------
 # 应用本地启动会写 logs/miniurl.log

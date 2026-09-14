@@ -23,13 +23,15 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/miniurl_db?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&rewriteBatchedStatements=true
     username: root
-    password: root
+    # 口令从环境变量注入：本地开发未设置时回退 root（开箱即用），
+    # 生产/CI 通过 .env 或容器环境变量覆盖，避免把真实口令写进仓库
+    password: ${MYSQL_PASSWORD:root}
   data:
     # Redis 配置
     redis:
       database: 0
       host: localhost
-      password: root
+      password: ${REDIS_PASSWORD:root}
       timeout: 5000
       port: 6379
       lettuce:
@@ -53,8 +55,11 @@ springdoc:
 server:
   port: 9191
 jwt:
-  # 秘钥
-  secret: SNwdqyha1vMAPrHX/OXuq4nnoLP2+fzuP5RHnVApWcg=
+  # HS256 签名密钥，从环境变量注入。
+  # 默认值仅供本地开发（clone 下来即可启动），**生产环境必须用 JWT_SECRET 覆盖**：
+  #   openssl rand -base64 48
+  # 该默认值已随仓库公开，用它跑生产等同于没有鉴权。
+  secret: ${JWT_SECRET:local-dev-only-insecure-jwt-secret-please-replace-in-production}
   # 过期时间：7天 (单位毫秒)
   refresh-expiration: 604800000
   # 刷新时间：30分钟 (单位毫秒)

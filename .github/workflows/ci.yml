@@ -74,6 +74,15 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v4
 
+      - name: 现场生成 JWT_SECRET
+        # docker-compose.yml 里 JWT_SECRET 用 `${JWT_SECRET:?...}` 声明为必填，
+        # 而 compose 在解析阶段就会插值整个文件（连 build 也逃不掉），所以必须在
+        # 第一条 compose 命令之前注入。
+        # 这里现场随机生成而非用 Repository Secret：CI 的密钥没有任何跨次稳定性
+        # 需求（每次都是隔离的一次性环境），现场生成省掉一个配置项，也消除了
+        # "secret 忘配导致 CI 红" 的故障源。
+        run: echo "JWT_SECRET=$(openssl rand -base64 48)" >> "$GITHUB_ENV"
+
       - name: 构建应用镜像（多阶段 Dockerfile）
         # 只 build 应用镜像；mysql/redis 直接拉官方镜像，不重复构建。
         # -f ci 覆盖：镜像 tag 用 miniurl-app:ci，不动生产栈的 :latest
