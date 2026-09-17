@@ -3,15 +3,18 @@
 #
 # 触发：push / PR 到 main，或手动 workflow_dispatch（Actions 页 Run workflow）
 #
-# job1 test               干净克隆上跑 Spotless 格式检查 + 全量单元测试（./mvnw spotless:check test），GitHub 托管 runner
+# job1 test               干净克隆上跑 Spotless 格式检查 + 全量单元测试（./mvnw spotless:check test）
 # job2 docker-compose-test 依赖 job1，compose 构建应用镜像 + 起 mysql/redis/app
-#                           + 健康检查 + 冒烟脚本，模拟容器化部署
-#                           → 跑在 self-hosted runner（miniurl-vm，VM 模拟生产环境）
+#                           + 健康检查 + 冒烟脚本，验证容器化部署
 #
-# job2 隔离说明：VM 上常驻模拟生产栈（miniurl-* 容器 + 3306/6379/9191 端口），
-#   job2 通过 docker-compose.ci.yml 覆盖 + COMPOSE_PROJECT_NAME=miniurl-ci 实现三层隔离：
-#   容器名 miniurl-ci-*、端口 13306/16379/19191、独立卷前缀 → down -v 只清 CI 自己的卷。
-# 零密钥、零第三方服务；job1 托管 runner，job2 self-hosted（VM 有真实 Docker 环境）
+# 两个 job 都用 GitHub 托管 runner。不用 self-hosted 的原因：仓库是公开的，
+#   fork 出来的 PR 能在 self-hosted runner 上执行任意代码，而 runner 所在机器上
+#   有常驻服务与 .env —— 等于把内网执行权交给任何提 PR 的人。托管 runner 每次
+#   都是干净的一次性环境，天然规避该风险；公开仓库的 runner 分钟数也不计费。
+#   代价：Dockerfile 的 --mount=type=cache 不跨 job 保留，每次构建要重下 Maven
+#   依赖（慢几分钟），换来的是不需要维护一台常开的构建机。
+#
+# 零密钥、零第三方服务
 # ============================================================
 
 name: CI
@@ -57,14 +60,15 @@ jobs:
         # --batch-mode 关闭交互提示；--no-transfer-progress 精简 Maven 下载日志
         run: ./mvnw --batch-mode --no-transfer-progress test
 
-  # ---------- job2：Docker 镜像部署测试（self-hosted 隔离） ----------
+  # ---------- job2：Docker 镜像部署测试 ----------
   docker-compose-test:
     name: Docker 镜像部署测试 (三件套 + 冒烟)
-    runs-on: [self-hosted, linux, x64]      # VM 模拟生产环境（真实 Linux Docker）
+    runs-on: ubuntu-latest
     needs: test                   # 单元测试过了才构建镜像
     timeout-minutes: 30
-    # 隔离核心：项目名加前缀 → 卷/网络不和生产栈（miniurl）共享；
-    # 端口/容器名隔离在 docker-compose.ci.yml 里覆盖
+    # 项目名前缀 + docker-compose.ci.yml 的容器名/端口覆盖，是早期 self-hosted
+    # 时期为避开同机常驻的生产栈而加的。托管 runner 是干净环境，这些隔离已无
+    # 对象，属冗余但无害；本次不动是为了让 runner 切换保持单一变量、便于验证
     env:
       COMPOSE_PROJECT_NAME: miniurl-ci
     defaults:
@@ -113,16 +117,7 @@ jobs:
         run: bash smoke_status.sh
 
       - name: 清理容器与数据卷（无论成败都执行）
-        # COMPOSE_PROJECT_NAME=miniurl-ci → down -v 只删 CI 自己的容器/卷，生产栈不受影响
+        # 托管 runner 随实例销毁，容器/卷本就会消失；此步是显式收尾，
+        # 让 workflow 的生命周期自成闭环，不依赖 runner 的回收时机
         if: always()
         run: docker compose -f docker-compose.yml -f docker-compose.ci.yml down -v
-
-      - name: 清理 CI 镜像与过期构建缓存（保留 cache mount 复用 Maven 依赖）
-        # Dockerfile 用 --mount=type=cache 缓存 /root/.m2（跨构建复用，避免每次重下依赖）。
-        # 不能裸 docker builder prune -f——会清掉 .m2 缓存卷，回到每次 CI 全量重编；
-        # --filter until=72h 只清 72h 未用的旧缓存，刚构建用过的 .m2 卷（last-used 最新）被保留。
-        # rmi 删 CI 镜像释放镜像层空间；build cache 层留下复用
-        if: always()
-        run: |
-          docker rmi miniurl-app:ci 2>/dev/null || true
-          docker builder prune -f --filter until=72h

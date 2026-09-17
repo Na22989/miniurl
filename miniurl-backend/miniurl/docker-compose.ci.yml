@@ -1,17 +1,22 @@
 # ============================================================
-# MiniURL CI 专用 compose override — 与 VM 模拟生产栈隔离
+# MiniURL CI 专用 compose override
 #
-# 背景：job2（docker-compose-test）切到 self-hosted runner（VM）后，
-#       VM 上已运行模拟生产栈（container_name=miniurl-*，端口 3306/6379/9191/80）。
-#       若 job2 直接用 docker-compose.yml，会撞容器名 + 端口，且 down -v 会删生产数据卷。
+# 由来：job2 早期跑在 self-hosted runner（VM）上，而那台 VM 同时常驻模拟生产栈
+#       （container_name=miniurl-*，占用 3306/6379/9191/80）。直接用主 compose 会撞
+#       容器名和端口，且 down -v 会连生产数据卷一起删，因此加了这层隔离：
+#       项目名前缀 + 容器名覆盖 + 端口整体替换。
 #
-# 隔离三件套：
-#   1. COMPOSE_PROJECT_NAME（在 ci.yml 里设 miniurl-ci）→ 卷名/网络名加前缀，down -v 只清 CI 自己的卷
-#   2. container_name 覆盖为 miniurl-ci-* → 容器名不与生产栈冲突
-#   3. ports 用 !override 整体替换 → 避开 3306/6379/9191 已占用端口
+# 现状：job2 已改用 GitHub 托管 runner —— 每次都是干净的一次性环境，没有同机生产栈，
+#       上述三项隔离失去作用对象。本文件里**当前仍然必要**的只有最后一项：
+#         MINIURL_BASE_URL: http://localhost:19191
+#       CI 不起 nginx，必须把 base-url 从主 compose 的「nginx:80 入口」改指 app 端口，
+#       否则冒烟脚本创建的短链会指向一个没有服务在听的地址。
+#       其余覆盖保留不动，是为了让 runner 切换保持单一变量、便于定位问题。
 #
-# 注意：ports 数组在 override 里默认是「追加」不是「替换」，必须用 !override 标量替换，
-#      否则 ["13306:3306"] 会和 base 的 ["3306:3306"] 叠加，照样撞端口。
+# 注意：ports 数组在 override 里默认是「追加」不是「替换」，必须用 !override 整体替换，
+#       否则 ["13306:3306"] 会和 base 的 ["3306:3306"] 叠加，照样撞端口。
+#       （隔离本身虽已冗余，但这个坑仍是本文件最容易踩的地方，说明保留。）
+#
 # 用法：COMPOSE_PROJECT_NAME=miniurl-ci docker compose -f docker-compose.yml -f docker-compose.ci.yml ...
 # ============================================================
 
