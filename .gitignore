@@ -3,8 +3,8 @@
 # 说明：后端项目自身还有 miniurl-backend/miniurl/.gitignore（target/、.idea 等），
 #       本文件负责根目录级别的杂物排除，两者叠加生效。
 #
-# 入库原则：只进代码 + 测试脚本 + 项目运行必需；
-#           设计文档（docs/、PRD、TECH_DESIGN、CLAUDE.md 等）最后阶段统一重写后再入库。
+# 入库原则：只进代码 + 测试脚本 + 项目运行必需；对外只发布 README.md，
+#           其余设计 / 学习 / 审计类文档保留在本地，见下方「本地文档」一节。
 # ============================================================
 
 # ---------- 环境变量 / 密钥 ----------
@@ -16,14 +16,13 @@
 # jar/：本地下载的依赖 jar 副本（87M），不入库
 jar/
 
-# ---------- 设计文档（最后阶段统一重写，暂不入库） ----------
+# ---------- 本地文档（不随仓库发布） ----------
+# 对外只发布 README.md；以下为设计稿 / 安全审计 / 阶段计划等个人笔记，仅存本地
 docs/
 PRD.md
 TECH_DESIGN.md
 ERROR_CODE.md
 WEEK1_PLAN.md
-CLAUDE.md
-# NetUtil 安全审计相关文档（同 docs/ 待遇）
 miniurl-backend/miniurl/BUG_FIX_PATCH.md
 miniurl-backend/miniurl/EXECUTIVE_SUMMARY.md
 miniurl-backend/miniurl/SECURITY_AUDIT_NetUtil.md
@@ -61,7 +60,3 @@ logs/
 # ---------- OS ----------
 .DS_Store
 Thumbs.db
-
-# ---------- Claude Code 本地配置 ----------
-# settings.local.json 是本机专属（权限/环境），不入库；共享的 settings.json 如出现则正常提交
-**/.claude/settings.local.json

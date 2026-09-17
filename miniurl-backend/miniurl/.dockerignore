@@ -13,7 +13,6 @@ target/
 *.iml
 
 # ===== 本地工具 / 缓存 =====
-.claude/
 .postman/
 postman/
 
