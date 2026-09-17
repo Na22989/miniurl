@@ -45,7 +45,7 @@
         </ConfigTestElement>
         <hashTree/>
         <CSVDataSet guiclass="TestBeanGUI" testclass="CSVDataSet" testname="CSV-短码列表">
-          <stringProp name="filename">D:/workspace/Na22989/miniurl/JmeterTest/shortcodes_15k.csv</stringProp>
+          <stringProp name="filename">${__P(codes,shortcodes_15k.csv)}</stringProp>
           <stringProp name="fileEncoding">UTF-8</stringProp>
           <stringProp name="variableNames">shortCode</stringProp>
           <boolProp name="ignoreFirstLine">true</boolProp>
@@ -111,7 +111,7 @@
               <connectTime>true</connectTime>
             </value>
           </objProp>
-          <stringProp name="filename">D:\workspace\Na22989\miniurl\JmeterTest\summary02.csv</stringProp>
+          <stringProp name="filename">${__P(summary,summary02.csv)}</stringProp>
         </ResultCollector>
         <hashTree/>
         <ResultCollector guiclass="ViewResultsFullVisualizer" testclass="ResultCollector" testname="View Results Tree（调试用，正式跑请禁用）" enabled="false">

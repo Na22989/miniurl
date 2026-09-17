@@ -30,9 +30,17 @@ miniurl-backend/miniurl/SECURITY_AUDIT_NetUtil.md
 # ---------- Linux 学习练习环境（非项目代码） ----------
 linux-lab/
 
-# ---------- JMeter 压测（保留脚本和输入，忽略结果输出） ----------
-# 保留入库：*.sh 场景脚本、*.jmx 测试计划、shortcodes*.csv（输入数据）
-# 以下为压测结果汇总 CSV（含 33M 的 scene03 结果），属生成物，忽略
+# ---------- JMeter 压测（保留脚本与测试计划，忽略生成物） ----------
+# 保留入库：*.sh 场景脚本、*.jmx 测试计划
+# 短码清单 CSV 由 BatchCreate*.sh 现场生成，内容指向当时库里的数据，
+# 对 clone 下来的人无效（跑出来全是 404），故不随仓库发布
+JmeterTest/shortcodes_15k.csv
+JmeterTest/pressure-p46/*.csv
+JmeterTest/pressure-p46/results/
+JmeterTest/pressure-p46/temp/
+JmeterTest/pressure-p46/metrics/
+
+# 压测结果汇总 CSV（含 33M 的 scene03 结果），属生成物
 JmeterTest/Summary_*.csv
 JmeterTest/summary*.csv
 
