@@ -498,8 +498,8 @@ class LinkServiceImplTest {
         when(bloomFilter.mightContain(SHORT_CODE)).thenReturn(true);
         when(shortCodeLocalCache.getIfPresent(SHORT_CODE)).thenReturn(null);
         when(valueOperations.get(anyString()))
-                .thenReturn("{\"linkId\":100,\"longUrl\":\"https://www.baidu.com\",\"expireTime\":\"2020-01-01T00:00:00\"}",
-                        null); // 快路径命中过期值 → 清理；double-check 已不命中，避免同一过期值重复计量
+                .thenReturn("{\"linkId\":100,\"longUrl\":\"https://www.baidu.com\",\"expireTime\":\"2020-01-01T00:00:00\"}")
+                .thenReturn(null); // 快路径命中过期值 → 清理；double-check 已不命中，避免同一过期值重复计量
         when(objectMapper.readValue(anyString(), eq(LinkCacheValue.class))).thenReturn(expiredValue);
         when(valueOperations.setIfAbsent(anyString(), anyString(), any(Duration.class))).thenReturn(true);
         when(linkMapper.selectOne(any(LambdaQueryWrapper.class), anyBoolean())).thenReturn(mockLink);
