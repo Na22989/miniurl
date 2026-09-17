@@ -7,9 +7,9 @@
 # job2 docker-compose-test 依赖 job1，compose 构建应用镜像 + 起 mysql/redis/app
 #                           + 健康检查 + 冒烟脚本，验证容器化部署
 #
-# 两个 job 都用 GitHub 托管 runner。不用 self-hosted 的原因：仓库是公开的，
-#   fork 出来的 PR 能在 self-hosted runner 上执行任意代码，而 runner 所在机器上
-#   有常驻服务与 .env —— 等于把内网执行权交给任何提 PR 的人。托管 runner 每次
+# 两个 job 都用 GitHub 托管 runner。不用 self-hosted 的原因：仓库按对外公开规划，
+#   而 fork 出来的 PR 能在 self-hosted runner 上执行任意代码，runner 所在机器上
+#   又有常驻服务与 .env —— 等于把内网执行权交给任何提 PR 的人。托管 runner 每次
 #   都是干净的一次性环境，天然规避该风险；公开仓库的 runner 分钟数也不计费。
 #   代价：Dockerfile 的 --mount=type=cache 不跨 job 保留，每次构建要重下 Maven
 #   依赖（慢几分钟），换来的是不需要维护一台常开的构建机。
@@ -43,10 +43,10 @@ jobs:
         working-directory: miniurl-backend/miniurl
     steps:
       - name: 检出代码
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: 安装 JDK 17 (Temurin) 并缓存 Maven 依赖
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           java-version: '17'
           distribution: temurin
@@ -76,7 +76,7 @@ jobs:
         working-directory: miniurl-backend/miniurl
     steps:
       - name: 检出代码
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: 现场生成 JWT_SECRET
         # docker-compose.yml 里 JWT_SECRET 用 `${JWT_SECRET:?...}` 声明为必填，
