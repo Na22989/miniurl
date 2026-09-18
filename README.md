@@ -169,7 +169,7 @@ docker compose up -d                           # 短链变为 http://192.168.100
 
 ## 已知局限
 
-这些是我在开发和压测中**确认**的问题，刻意保留在 README 里。知道系统边界在哪，
+这些是我在开发和压测中发现的问题，刻意保留在 README 里。知道系统边界在哪，
 比假装它没有边界更有意义。每条都写清了触发条件与修复方向。
 
 ### 1. 布隆过滤器是进程内内存，多实例部署会产生假阴性
@@ -229,6 +229,36 @@ docker compose up -d                           # 短链变为 http://192.168.100
 
 **修复方向**：`ThreadLocal` 分段或改用无锁序列。
 
+### 6. 本地缓存 L1 在多实例间不会互相失效
+
+读路径是 L1（Caffeine）→ L2（Redis）→ DB 的 Cache-Aside 多级缓存，
+`shortCodeLocalCache` 是 **JVM 进程内**的 Caffeine 实例（`expireAfterWrite` 5 分钟）。
+
+`deleteLink()` 里做了两件事：
+
+```java
+stringRedisTemplate.delete(SHORT_CODE_PREFIX + link.getShortCode()); // L2：Redis，所有实例共享
+shortCodeLocalCache.invalidate(link.getShortCode());                 // L1：仅当前 JVM
+```
+
+第一行删的是 Redis，**删了就是删了**；第二行 `invalidate` 只作用于**当前进程**。
+
+- **单实例**：没问题——L1、L2 同时失效，删除立即生效
+- **多实例**：实例 A 删除 → A 的 L1 已失效，但实例 B 的 L1 里**仍持有该短链的缓存值**
+  → B 上的请求在 L1 就命中了，**根本不会去查那条已经被删掉的 Redis 键**
+  → **用户最长 5 分钟（L1 的 TTL）内仍能通过 B 访问一条已删除的短链**
+
+触发前提是 B 在此之前服务过这个短码（L2 命中会回填 L1），所以不是纯理论边界——
+实例数一多、访问一分散就会碰到。
+
+**修复方向**：L1 失效改为广播——删除后往 Redis Pub/Sub（或消息队列）发一条失效通知，
+各实例收到后各自 `invalidate`。也可以直接把 L1 的 TTL 压到秒级：L1 换来的收益本就只是
+省一次 Redis RTT，为它承担 5 分钟的不一致窗口并不划算。
+
+**验证状态**：本条**由代码路径推导，尚未做多实例实测**。触发链条依赖的每一步
+（L1 命中即返回、`invalidate` 的进程内语义）都能在上面引用的代码里直接读到，
+但没有跑过双实例复现。
+
 ## 目录结构
 
 ```
@@ -269,7 +299,7 @@ miniurl/
 
 - `./mvnw test` — **158/158** 通过（服务层单测 + 安全用例 + 定时任务）
 - `./mvnw spotless:check` — 格式门禁（removeUnusedImports / 行尾空白 / 文件结尾换行）
-- CI（GitHub Actions）：job1 托管 runner 跑 Spotless + 单测；job2 self-hosted runner 构建镜像、起三件套、跑 `smoke_status.sh` 冒烟
+- CI（GitHub Actions）：两个 job 都跑在 GitHub 托管 runner 上——job1 跑 Spotless + 全量单测；job2 构建镜像、起 MySQL/Redis/App 三件套、跑 `smoke_status.sh` 冒烟
 
 ## 关于 AI 参与
 
